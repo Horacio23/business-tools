@@ -1,0 +1,22 @@
+# This repo lives inside ~/.claude/skills but tracks ONLY the custom agency skills.
+# Everything else here (third-party / plugin skills, OS cruft) is ignored.
+
+# Ignore every top-level entry by default...
+/*
+
+# ...then re-include the custom agency skills and repo meta.
+!/.gitignore
+!/README.md
+!/client-onboarding/
+!/ghl-delivery/
+!/ghl-email-templates/
+!/ghl-calendars/
+!/ghl-chat-widget/
+!/ghl-cadence/
+!/resell-sequence/
+
+# Never commit secrets or OS junk if they ever appear inside a skill folder.
+**/.DS_Store
+**/Thumbs.db
+**/*.env
+**/ghl-credentials.md

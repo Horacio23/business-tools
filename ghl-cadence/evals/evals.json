@@ -1,0 +1,46 @@
+{
+  "skill_name": "ghl-cadence",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a sales cadence in a Word doc that I need to turn into a GHL workflow. The file is at evals/files/simple-cadence.docx — it's a simple 5-step email and call sequence for enterprise outbound. The trigger should be 'Contact Added'.",
+      "expected_output": "A well-structured prompt for GHL's AI Workflow Builder that includes all 5 steps with correct channels (email/call), wait steps between days, and email subject lines from the cadence.",
+      "files": ["evals/files/simple-cadence.docx"],
+      "expectations": [
+        "All 5 cadence steps are present in the generated prompt",
+        "Correct channels: email for Days 1, 5, 12 and call task for Days 3, 8",
+        "Wait steps use correct day deltas (2, 2, 3, 4 days)",
+        "Email subject lines are included",
+        "Trigger is 'Contact Added'",
+        "Output is structured and copy-pasteable"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Convert this ABM cadence into a prompt I can paste into GoHighLevel's AI workflow builder. The cadence doc is at evals/files/complex-multichannel-cadence.docx. It uses multiple channels including LinkedIn, email, calls, SMS, and voicemail. The document mentions using a 'New Lead' pipeline trigger.",
+      "expected_output": "A comprehensive GHL AI builder prompt covering all 10 touches across 5 channels, with proper wait steps, the pipeline trigger, and handling of the 'Email + Call' combined touch on Day 14.",
+      "files": ["evals/files/complex-multichannel-cadence.docx"],
+      "expectations": [
+        "All 10 touches are represented",
+        "All 5 channels used correctly (LinkedIn, Email, Call, SMS, Voicemail)",
+        "Email + Call combo on Day 14 is split into two steps",
+        "Pipeline trigger is used",
+        "Wait steps use correct day deltas",
+        "GHL dynamic values used for personalization placeholders"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I have a quick follow-up sequence at evals/files/minimal-cadence.docx. Can you turn it into a GHL workflow prompt? It's just 3 steps. Use a form submission trigger.",
+      "expected_output": "A concise GHL AI builder prompt with 3 steps, correct channel mapping (Text→SMS, E-mail→email, Phone→call task), form submission trigger, and appropriate wait steps.",
+      "files": ["evals/files/minimal-cadence.docx"],
+      "expectations": [
+        "All 3 steps present",
+        "Non-standard column names correctly mapped",
+        "Action types correctly mapped: Text→SMS, E-mail→email, Phone→call",
+        "Form submission trigger used",
+        "Output is concise and proportional"
+      ]
+    }
+  ]
+}
