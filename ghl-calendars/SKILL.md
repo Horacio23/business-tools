@@ -5,7 +5,9 @@ description: >
   Use this skill whenever the user wants to create a calendar or calendar group/category,
   create an appointment, see upcoming appointments, list calendar events, book a meeting,
   check their schedule, or manage calendars/appointments in GoHighLevel/GHL/HighLevel.
-  Also trigger when the user mentions scheduling, booking, or calendar management in a GHL context.
+  Also trigger when the user mentions scheduling, booking, or calendar management in a GHL context,
+  including adding a deposit / partial payment / "accept payments" or theming the booking
+  widget colors on a calendar.
 ---
 
 # GHL Calendars & Appointments
@@ -129,6 +131,50 @@ Use this when the user wants to create one or more calendars, optionally organiz
    ```
 
    Always include each calendar's `id` so the user can reference them later. If calendars belong to groups, group them under their group name; list any calendars without a group under **Ungrouped**.
+
+## Workflow (OPTIONAL): Add a Deposit / Partial Payment + Widget Colors
+
+Use this when the user wants a calendar to **collect a deposit / partial payment** at booking, and/or to **theme the booking-widget colors**. This is the native GHL Neo booking widget (payment + card validation happen inside the widget — no card handling on our side).
+
+> ⚠️ These settings are **NOT** on the public API. They live on GHL's **internal** host `https://backend.leadconnectorhq.com` (same PIT token, but `Version: 2021-04-15`). This host is undocumented and could change. **Full details, field schemas, gotchas, and a working Node reference implementation are in the vault: [[GHL Calendar Payment Provisioning]] — read it before running this flow.** Only the essentials are here.
+
+**Prerequisite — availability:** availability lives in a separate **Schedule object**, not on the calendar. A calendar created via the flow above with a `teamMembers` user **auto-subscribes** to that user's schedule, so availability already works. Do NOT set `openHours` on a schedule-based calendar (it detaches it).
+
+**Steps (GET → sanitize → merge → PUT):**
+
+1. **GET** the calendar from the backend host:
+   `GET https://backend.leadconnectorhq.com/calendars/{calendarId}` (headers: `Authorization: Bearer <PIT>`, `Version: 2021-04-15`).
+2. **Sanitize** the returned object (GET and PUT schemas differ — skipping this returns 422):
+   - strip `id`, `traceId`, `notifications`, `locationId`
+   - rename `formSubmitRedirectUrl` → `formSubmitRedirectURL`
+   - **drop `openHours` if empty** (`{}`) and **drop `availabilities` if empty** (`[]`) — sending either empty **detaches the calendar from its schedule and kills availability**.
+3. **Merge in** the payment + color blocks and PUT the whole object back to `PUT https://backend.leadconnectorhq.com/calendars/{calendarId}`:
+   ```json
+   {
+     "isLivePaymentMode": true,
+     "stripe": { "amount": 100, "currency": "USD", "deposit": 35, "depositType": "percentage", "chargeDescription": "Booking deposit", "isCouponEnabled": false },
+     "widgetConfig": {
+       "primarySettings": { "primaryColor": "#2563EBFF", "backgroundColor": "#FFFFFFFF", "buttonText": "Book & Pay Deposit", "showCalendarTitle": true, "showCalendarDescription": true, "showCalendarDetails": true },
+       "default": false,
+       "pageOrder": [ {"kind":"calendar","position":0}, {"kind":"form","position":1} ]
+     }
+   }
+   ```
+   - `amount` = full price; `deposit` + `depositType` (`"percentage"` or `"flat"`) = the deposit taken at booking.
+   - `isLivePaymentMode`: `true` = real charges, `false` = test mode. **Confirm live vs test with the user.**
+   - Colors **must** be UPPERCASE 8-digit RGBA (`#RRGGBBFF`) and `widgetConfig.default` **must** be `false`, or the widget ignores them. `widgetType` stays `"default"` (that is the Neo widget).
+
+4. **Blind write — verify in the UI.** A PIT never reads `stripe`/`widgetConfig` back (GET omits them), so a 200 is not proof. Confirm in GHL: Calendar → Forms & Payments (deposit + live/test) and the widget preview (colors), and that bookable times still show.
+
+5. **Embed** (deterministic, no API): 
+   ```html
+   <iframe src="https://{BRANDED_DOMAIN}/widget/booking/{calendarId}" style="width:100%;border:none;overflow:hidden;" scrolling="no" allow="payment *"></iframe>
+   <script src="https://{BRANDED_DOMAIN}/js/form_embed.js" type="text/javascript"></script>
+   ```
+   `allow="payment *"` is required for the payment step. `{BRANDED_DOMAIN}` = the sub-account's API Domain.
+
+**Safety:** real client sub-accounts. Test against one throwaway calendar (test mode) before bulk-applying. See the vault SOP for the dry-run reference implementation.
+
 ## Workflow: View Appointments
 
 1. **Get calendars** to know which calendar(s) exist:
