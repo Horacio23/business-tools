@@ -14,9 +14,10 @@
  *   # Create a calendar assigned to a user (auto-joins that user's availability schedule):
  *   node ghl-cal.mjs create --name "Botox Consult" --user <userId>
  *
- *   # Add a deposit + colors to an existing calendar (GET->sanitize->merge->PUT):
+ *   # Add a deposit + colors to an existing calendar (GET->sanitize->merge->PUT).
+ *   # LIVE by default (real charges) — pass --test for test mode. Colors from the client's brand:
  *   node ghl-cal.mjs pay <calendarId> --amount 100 --deposit 35 --type percentage \
- *        --primary "#2563EBFF" --bg "#FFFFFFFF" --button "Book & Pay Deposit" [--live] [--dry-run]
+ *        --primary "#8C9C86FF" --bg "#FAF6EFFF" --button "Book & Pay Deposit" [--test] [--dry-run]
  *
  *   # Print the embed snippet:
  *   node ghl-cal.mjs embed <calendarId> --domain book.yourclient.com
@@ -74,19 +75,24 @@ export async function createCalendar(token, locationId, { name, userId, slotDura
   return out.calendar.id;
 }
 
-/** Build the payment PUT body without sending (used for --dry-run and by addPayment). */
-export function buildPaymentBody(cal, { amount, deposit, depositType = 'percentage', live = false,
-  primaryColor = '#2563EBFF', backgroundColor = '#FFFFFFFF', buttonText = 'Book & Pay Deposit',
+/** Build the payment PUT body without sending (used for --dry-run and by addPayment).
+ *  live defaults to TRUE (real charges). Widget colors are applied ONLY when both are provided —
+ *  otherwise the calendar's existing theme is preserved (a PIT can't read colors back to merge them). */
+export function buildPaymentBody(cal, { amount, deposit, depositType = 'percentage', live = true,
+  primaryColor, backgroundColor, buttonText = 'Book & Pay Deposit',
   chargeDescription = 'Booking deposit' }) {
-  return {
+  const body = {
     ...sanitizeForPut(cal),
     isLivePaymentMode: live,
     stripe: { amount, currency: 'USD', deposit, depositType, chargeDescription, isCouponEnabled: false },
-    widgetConfig: {
+  };
+  if (primaryColor && backgroundColor) {
+    body.widgetConfig = {
       primarySettings: { primaryColor, backgroundColor, buttonText, showCalendarTitle: true, showCalendarDescription: true, showCalendarDetails: true },
       default: false, pageOrder: [{ kind: 'calendar', position: 0 }, { kind: 'form', position: 1 }],
-    },
-  };
+    };
+  }
+  return body;
 }
 
 /** Add deposit + colors to an existing calendar. Blind write — verify in UI. */
@@ -125,7 +131,7 @@ async function main() {
   } else if (cmd === 'pay') {
     const id = pos[0];
     const opts = { amount: Number(m.amount), deposit: Number(m.deposit), depositType: m.type || 'percentage',
-      live: !!m.live, primaryColor: m.primary, backgroundColor: m.bg, buttonText: m.button };
+      live: !m.test, primaryColor: m.primary, backgroundColor: m.bg, buttonText: m.button }; // live by default; --test forces test mode
     if (m['dry-run']) {
       const cal = await getCalendar(token, id);
       console.log('DRY RUN — would PUT to', `${BE}/calendars/${id}`);

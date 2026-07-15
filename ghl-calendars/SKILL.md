@@ -161,8 +161,9 @@ Use this when the user wants a calendar to **collect a deposit / partial payment
    }
    ```
    - `amount` = full price; `deposit` + `depositType` (`"percentage"` or `"flat"`) = the deposit taken at booking.
-   - `isLivePaymentMode`: `true` = real charges, `false` = test mode. **Confirm live vs test with the user.**
-   - Colors **must** be UPPERCASE 8-digit RGBA (`#RRGGBBFF`) and `widgetConfig.default` **must** be `false`, or the widget ignores them. `widgetType` stays `"default"` (that is the Neo widget).
+   - **`isLivePaymentMode`: always `true`** (real charges) — this is the default for real client calendars. Only use `false` (test mode) if the user explicitly asks to test.
+   - **Widget colors — source from the client's brand:** read the client's website / brand colors from `Clients/{Name}/brand-context.md` (or their live site). Map **primaryColor** ← the brand's **primary accent / button** color, and **backgroundColor** ← a **light** brand background color (page background). The widget has only an accent + a background surface — do NOT put two saturated brand colors adjacent (contrast breaks); pair the accent with a light background. **If brand colors are not available, ASK the user for the primary and secondary/background colors before applying.**
+   - Colors **must** be UPPERCASE 8-digit RGBA (`#RRGGBBFF`) — convert any 6-digit brand hex by appending `FF`. `widgetConfig.default` **must** be `false`, or the widget ignores them. `widgetType` stays `"default"` (that is the Neo widget).
 
 4. **Blind write — verify in the UI.** A PIT never reads `stripe`/`widgetConfig` back (GET omits them), so a 200 is not proof. Confirm in GHL: Calendar → Forms & Payments (deposit + live/test) and the widget preview (colors), and that bookable times still show.
 
