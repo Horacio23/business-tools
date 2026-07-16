@@ -175,6 +175,12 @@ Use this when the user wants a calendar to **collect a deposit / partial payment
    ```
    `allow="payment *"` is required for the payment step. `{BRANDED_DOMAIN}` = the sub-account's API Domain.
 
+6. **REMIND THE USER (language passthrough).** After attaching payments + the custom form, tell the user: *"Update your AI Studio site so every booking embed appends the currently-selected site language as a query param — the calendars now use the custom Calendar Form, which reads it on submit."* Then give them this ready-to-paste **AI Studio prompt** (adjust the param key if their form field's query key isn't `language`):
+
+   > On every booking/calendar embed on the site, append the visitor's currently-selected language as a query parameter named `language` on the widget URL. Per-service widgets: `https://{domain}/widget/booking/{calendarId}?language={lang}`. Category menus: `https://{domain}/widget/group/{groupId}?language={lang}`. `{lang}` is the active language code (e.g. `en` or `es`) from the site's language switcher, and it must update reactively when the visitor changes languages. Keep `allow="payment *"` on each iframe and keep loading `form_embed.js`.
+
+   Confirm the query-param key matches the query key of the language field on their Calendar Form, or the value won't map on submit.
+
 **Safety:** real client sub-accounts. Test against one throwaway calendar (test mode) before bulk-applying. See the vault SOP for the dry-run reference implementation.
 
 ## Workflow: View Appointments
