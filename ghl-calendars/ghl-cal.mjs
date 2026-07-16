@@ -79,13 +79,14 @@ export async function createCalendar(token, locationId, { name, userId, slotDura
  *  live defaults to TRUE (real charges). Widget colors are applied ONLY when both are provided —
  *  otherwise the calendar's existing theme is preserved (a PIT can't read colors back to merge them). */
 export function buildPaymentBody(cal, { amount, deposit, depositType = 'percentage', live = true,
-  primaryColor, backgroundColor, buttonText = 'Book & Pay Deposit',
+  formId, primaryColor, backgroundColor, buttonText = 'Book & Pay Deposit',
   chargeDescription = 'Booking deposit' }) {
   const body = {
     ...sanitizeForPut(cal),
     isLivePaymentMode: live,
     stripe: { amount, currency: 'USD', deposit, depositType, chargeDescription, isCouponEnabled: false },
   };
+  if (formId) body.formId = formId; // attach the account's custom "Calendar Form" (needed for language var passthrough)
   if (primaryColor && backgroundColor) {
     body.widgetConfig = {
       primarySettings: { primaryColor, backgroundColor, buttonText, showCalendarTitle: true, showCalendarDescription: true, showCalendarDetails: true },
@@ -131,7 +132,7 @@ async function main() {
   } else if (cmd === 'pay') {
     const id = pos[0];
     const opts = { amount: Number(m.amount), deposit: Number(m.deposit), depositType: m.type || 'percentage',
-      live: !m.test, primaryColor: m.primary, backgroundColor: m.bg, buttonText: m.button }; // live by default; --test forces test mode
+      live: !m.test, formId: m.form, primaryColor: m.primary, backgroundColor: m.bg, buttonText: m.button }; // live by default; --test forces test mode
     if (m['dry-run']) {
       const cal = await getCalendar(token, id);
       console.log('DRY RUN — would PUT to', `${BE}/calendars/${id}`);
