@@ -181,6 +181,17 @@ Use this when the user wants a calendar to **collect a deposit / partial payment
 
    Confirm the query-param key matches the query key of the language field on their Calendar Form, or the value won't map on submit.
 
+7. **REMIND THE USER (style the Calendar Form manually).** Form design can't be set via API (the form-save route is IAM-blocked for PIT *and* OAuth — see memory `ghl-form-styling-iam-blocked`), so it's a one-time UI edit per account. Tell the user, echoing the **actual colors used** in this run (strip the `FF` alpha for the form builder's picker):
+
+   > The calendars are themed, but the custom **Calendar Form** must be styled by hand to match (one-time, per account). In GHL: **Sites → Forms → Calendar Form → Styles**, then set:
+   > - **Primary Color:** `{primaryColor}` (accent — focus rings, checkboxes, date-picker)
+   > - **Submit button background:** `{primaryColor}` (keep button text white)
+   > - **Background:** `{backgroundColor}`
+   >
+   > Save. Since every calendar points to this one form, it themes them all.
+
+   Where `{primaryColor}` / `{backgroundColor}` are the same values passed to the payment step (e.g. sage `#8C9C86` on cream `#FAF6EF`). Add this as a line on the client's onboarding/delivery checklist so it isn't missed.
+
 **Safety:** real client sub-accounts. Test against one throwaway calendar (test mode) before bulk-applying. See the vault SOP for the dry-run reference implementation.
 
 ## Workflow: View Appointments
