@@ -1,0 +1,511 @@
+<title>{{CLIENT_SHORT}} {{MONTH_LABEL}}</title>
+<!--
+  META ADS REPORT DECK: TEMPLATE
+  ------------------------------------------------------------------------------
+  Copy this file, then replace every double-brace placeholder and every block
+  marked REPEAT / OPTIONAL. Delete these guidance comments as you go: they are
+  for building, not for the client. When you're done, a grep for two opening
+  braces must return nothing. (No comment in this template contains them, so
+  any hit is a real unfilled placeholder.)
+
+  Brand: set the tokens in :root from the client's brand-context.md or website.
+  Keep the token NAMES; only change the values.
+    --deep       very dark brand color (cover + closing background)
+    --primary    main text / heading color (dark)
+    --accent     brand accent, used for italics, numbers, chart bars
+    --accent-lt  lighter accent that reads on --deep
+    --ground     slide background (light)
+    --sand       soft surface (callouts, bar tracks)
+    --line       hairlines
+    --muted      secondary text
+    --c1..--c6   one color per campaign. A campaign keeps its color on every
+                 slide AND from month to month (reuse the mapping from the
+                 client's previous report in Clients/<client>/reports/ if one
+                 exists), so reports can be compared. Tables sort by cost, so the
+                 color order won't match row order, and that's fine. Colors must be
+                 distinguishable: brand hues first, then a muted neutral (sage,
+                 slate). If a color is light, give its .sbar segment class="lt".
+  Fonts: swap the Google Fonts link + --serif / --sans to the client's fonts.
+
+  Language: labels below are Spanish (the default). For an English report,
+  translate every visible string, including nav buttons and aria-labels.
+
+  This deck deliberately uses one look (light slides, dark cover and closing)
+  instead of following the viewer's light/dark theme. Don't add dark-mode blocks.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{
+  --deep:#221913; --primary:#392B23; --accent:#8D6E5E; --accent-lt:#C9A68C;
+  --ground:#F8F6F1; --sand:#F1ECE1; --line:#E3DACD; --muted:#70635C; --white:#FFFFFF;
+  --c1:#B07A52; --c2:#7D8B74; --c3:#392B23; --c4:#CDB9A5; --c5:#A7887A; --c6:#5E6B73;
+  --good:#3F7A4E; --good-bg:#E3EEE2; --bad:#A0402E; --bad-bg:#F4E1DA; --na-bg:#EEE8DE;
+  --on-deep:#F3E6D6; --on-deep-2:#CFC2B6; --on-deep-3:#A8978A;
+  --serif:'Playfair Display',Georgia,'Times New Roman',serif;
+  --sans:Inter,'Segoe UI',Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{background:var(--deep)}
+body{margin:0;color:var(--primary);font-family:var(--sans);padding-inline:16px;padding-block:20px;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+
+.deck{width:min(100%, calc((100vh - 100px) * 16 / 9));min-width:0}
+/* 1280x720 design grid: every size is calc(var(--u) * px) so slides scale as one piece */
+.slide{container-type:inline-size;width:100%;aspect-ratio:16/9;max-width:100%;background:var(--ground);border-radius:4px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,.6);position:relative;--u:calc(100cqw / 1280)}
+.in{position:absolute;inset:0;padding:calc(var(--u)*56) calc(var(--u)*80) calc(var(--u)*44);display:flex;flex-direction:column;gap:calc(var(--u)*22)}
+
+h1,h2,h3{margin:0;font-family:var(--serif);font-weight:500;text-wrap:balance;color:var(--primary);font-variant-numeric:lining-nums}
+.card .big,.rec .n,.foot b{font-variant-numeric:lining-nums tabular-nums}
+h2{font-size:calc(var(--u)*46);line-height:1.08}
+h2 em,h1 em{font-style:italic;color:var(--accent)}
+p{margin:0}
+.eyebrow{font-size:calc(var(--u)*13);letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.lede{font-size:calc(var(--u)*19);line-height:1.55;color:var(--muted);max-width:calc(var(--u)*880)}
+.lede strong{color:var(--primary);font-weight:600}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* ---- Logo slot -----------------------------------------------------------
+   Use ONE of these two forms everywhere the LOGO_HTML placeholder appears:
+   (a) Text wordmark (when the site's logo is HTML text):
+       <span class="mark"><span class="w">Élite</span><span class="s">· Med Spa ·</span></span>
+       Match the site: font, italic or not, letter-spacing, and the small subline.
+       Drop the .s span if there is no subline.
+   (b) Image logo (a PNG/SVG in the client folder, embedded as a data URI):
+       <img class="logo-img" src="data:image/png;base64,..." alt="(client name)">
+       On the dark cover/closing slides a dark logo disappears. Use the light
+       version if there is one; otherwise remove class "dark" from those two slides. */
+.mark{display:inline-flex;flex-direction:column;align-items:center;line-height:1;color:inherit}
+.mark .w{font-family:var(--serif);font-style:italic;font-weight:500}
+.mark .s{text-transform:uppercase;letter-spacing:.42em;padding-left:.42em;opacity:.85;font-family:var(--sans)}
+.logo-img{display:block;width:auto;max-width:100%;object-fit:contain}
+.top .mark .w{font-size:calc(var(--u)*24)} .top .mark .s{font-size:calc(var(--u)*8.5);margin-top:calc(var(--u)*3)} .top .logo-img{height:calc(var(--u)*40)}
+.cover-mark .mark .w{font-size:calc(var(--u)*170)} .cover-mark .mark .s{font-size:calc(var(--u)*22);margin-top:calc(var(--u)*14)} .cover-mark .logo-img{max-height:calc(var(--u)*300);max-width:calc(var(--u)*460)}
+.close-mark .mark{align-items:flex-start} .close-mark .mark .w{font-size:calc(var(--u)*64)} .close-mark .mark .s{font-size:calc(var(--u)*11);margin-top:calc(var(--u)*8);padding-left:0} .close-mark .logo-img{height:calc(var(--u)*90)}
+
+.top{display:flex;justify-content:space-between;align-items:center;color:var(--accent)}
+.foot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;font-size:calc(var(--u)*12.5);color:var(--muted);border-top:1px solid var(--line);padding-top:calc(var(--u)*12)}
+.foot b{font-family:var(--serif);font-weight:500;font-size:calc(var(--u)*15);color:var(--accent);font-variant-numeric:tabular-nums}
+
+/* cover + closing */
+.dark{background:var(--deep);color:var(--on-deep)}
+.dark::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(ellipse 42% 55% at 72% 44%, color-mix(in srgb, var(--accent-lt) 30%, transparent), transparent 70%),
+  radial-gradient(ellipse 70% 60% at 72% 44%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 75%)}
+.dark .in{padding:calc(var(--u)*64) calc(var(--u)*88)}
+.cover-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;align-items:center}
+.cover-mark{justify-self:center;color:var(--on-deep);text-shadow:0 0 calc(var(--u)*30) color-mix(in srgb, var(--accent-lt) 50%, transparent)}
+.cover-copy{display:flex;flex-direction:column;gap:calc(var(--u)*18)}
+.cover-copy .eyebrow{color:var(--accent-lt)}
+.cover-copy h1{color:var(--ground);font-size:calc(var(--u)*60);line-height:1.04}
+.cover-copy h1 em{color:var(--accent-lt)}
+.cover-copy .rule{width:calc(var(--u)*64);height:1px;background:var(--accent-lt)}
+.cover-copy p{font-size:calc(var(--u)*18);color:var(--on-deep-2);line-height:1.5}
+.cover-foot{display:flex;justify-content:space-between;font-size:calc(var(--u)*13);letter-spacing:.14em;text-transform:uppercase;color:var(--on-deep-3);border-top:1px solid color-mix(in srgb, var(--accent-lt) 25%, transparent);padding-top:calc(var(--u)*16)}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--primary);border-bottom:1px solid var(--line)}
+.kpi{padding:calc(var(--u)*20) calc(var(--u)*20) calc(var(--u)*18) 0;display:flex;flex-direction:column;gap:calc(var(--u)*6)}
+.kpi + .kpi{padding-left:calc(var(--u)*22);border-left:1px solid var(--line)}
+.kpi .v{font-family:var(--serif);font-size:calc(var(--u)*54);line-height:1;font-variant-numeric:lining-nums tabular-nums;color:var(--primary)}
+.kpi.hero .v{color:var(--accent);font-style:italic}
+.kpi .l{font-size:calc(var(--u)*14.5);color:var(--muted)}
+.kpi .d{font-size:calc(var(--u)*13);font-weight:500;color:var(--muted)}
+.kpi .d.up{color:var(--good)} .kpi .d.down{color:var(--bad)}
+.minis{display:grid;grid-template-columns:repeat(4,1fr);column-gap:calc(var(--u)*28)}
+.minis div{display:flex;justify-content:space-between;font-size:calc(var(--u)*15);color:var(--muted);border-bottom:1px dotted var(--line);padding-block:calc(var(--u)*9)}
+.minis span:last-child{color:var(--primary);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* text + chart */
+.cols{flex:1;display:grid;grid-template-columns:calc(var(--u)*360) 1fr;gap:calc(var(--u)*48);align-items:center;min-height:0}
+.cols .text{display:flex;flex-direction:column;gap:calc(var(--u)*16)}
+.point{font-size:calc(var(--u)*16.5);line-height:1.55;color:var(--muted);border-left:2px solid var(--accent);padding-left:calc(var(--u)*14)}
+.point strong{color:var(--primary);font-weight:600}
+.chart svg{display:block;width:100%;height:auto}
+svg text{font-family:var(--sans)}
+.bar-fill{fill:var(--accent)} .grid-line{stroke:var(--line)} .axis-line{stroke:var(--primary)}
+.t-axis{fill:var(--muted)} .t-val{fill:var(--primary)} .t-lab{fill:var(--primary)} .t-sub{fill:var(--muted)}
+
+/* share + cost panels */
+.split{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*40);min-height:0}
+.panel{background:var(--white);border:1px solid var(--line);border-radius:calc(var(--u)*6);padding:calc(var(--u)*26);display:flex;flex-direction:column;gap:calc(var(--u)*18)}
+.panel h3{font-family:var(--sans);font-size:calc(var(--u)*13);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between}
+.panel h3 span{letter-spacing:0;text-transform:none;font-weight:500}
+.srow{display:flex;flex-direction:column;gap:calc(var(--u)*8)}
+.slabel{display:flex;justify-content:space-between;font-size:calc(var(--u)*15);color:var(--primary)}
+.sbar{display:flex;height:calc(var(--u)*46);gap:calc(var(--u)*2);border-radius:calc(var(--u)*3);overflow:hidden}
+.sbar i{display:flex;align-items:center;justify-content:center;font-style:normal;font-size:calc(var(--u)*15);font-weight:600;color:#fff;font-variant-numeric:tabular-nums;overflow:hidden;white-space:nowrap}
+.sbar i.lt{color:var(--primary)}
+.legend{display:flex;flex-wrap:wrap;gap:calc(var(--u)*8) calc(var(--u)*20);font-size:calc(var(--u)*14);color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:calc(var(--u)*7)}
+.legend span::before{content:"";width:calc(var(--u)*11);height:calc(var(--u)*11);border-radius:2px;background:var(--sw)}
+.crow{display:grid;grid-template-columns:calc(var(--u)*150) 1fr calc(var(--u)*72);align-items:center;gap:calc(var(--u)*14);font-size:calc(var(--u)*16)}
+.ctrack{height:calc(var(--u)*16);background:var(--sand);border-radius:2px;overflow:hidden}
+.ctrack b{display:block;height:100%;background:var(--sw)}
+.crow .val{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.callout{margin-top:auto;font-size:calc(var(--u)*15.5);line-height:1.5;color:var(--muted);background:var(--sand);border-radius:calc(var(--u)*4);padding:calc(var(--u)*12) calc(var(--u)*16)}
+.callout strong{color:var(--primary)}
+
+/* tables */
+table{border-collapse:collapse;width:100%;font-size:calc(var(--u)*16)}
+th,td{padding:calc(var(--u)*13) calc(var(--u)*12);text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
+th{font-size:calc(var(--u)*11.5);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--primary)}
+th:first-child,td:first-child{text-align:left;padding-left:0}
+th:last-child,td:last-child{padding-right:0}
+td.diag,th.diag{text-align:left;padding-left:calc(var(--u)*28)}
+tr.total td{font-weight:600;border-bottom:0;border-top:1px solid var(--primary)}
+table.tight{font-size:calc(var(--u)*14.5)}
+table.tight th,table.tight td{padding-block:calc(var(--u)*8.5)}
+table.tighter{font-size:calc(var(--u)*13)}
+table.tighter th,table.tighter td{padding-block:calc(var(--u)*6)}
+.dot{display:inline-block;width:calc(var(--u)*10);height:calc(var(--u)*10);border-radius:2px;margin-right:calc(var(--u)*10);background:var(--sw)}
+.best{color:var(--good);font-weight:600}
+.worst{color:var(--bad);font-weight:600}
+.chip{display:inline-block;padding:calc(var(--u)*3) calc(var(--u)*11);border-radius:999px;font-size:calc(var(--u)*12.5);font-weight:600}
+.chip.good{background:var(--good-bg);color:var(--good)}
+.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.chip.na{background:var(--na-bg);color:var(--muted)}
+.chip.paused{background:var(--na-bg);color:var(--muted);margin-left:calc(var(--u)*8);font-size:calc(var(--u)*11);vertical-align:1px}
+
+/* findings + recommendations */
+.grid2{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:calc(var(--u)*20);min-height:0}
+.card{background:var(--white);border:1px solid var(--line);border-radius:calc(var(--u)*6);padding:calc(var(--u)*24) calc(var(--u)*26);display:flex;flex-direction:column;gap:calc(var(--u)*10)}
+.card h3{font-size:calc(var(--u)*24);line-height:1.2}
+.card p{font-size:calc(var(--u)*16);line-height:1.55;color:var(--muted)}
+.card .big{font-family:var(--serif);font-style:italic;color:var(--accent);font-size:calc(var(--u)*17)}
+.recs{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;column-gap:calc(var(--u)*48);min-height:0}
+.rec{display:grid;grid-template-columns:calc(var(--u)*58) 1fr;align-content:start;padding-block:calc(var(--u)*20);border-top:1px solid var(--line)}
+.rec .n{font-family:var(--serif);font-style:italic;font-size:calc(var(--u)*44);line-height:.9;color:var(--accent)}
+.rec h3{font-size:calc(var(--u)*23);line-height:1.2;margin-bottom:calc(var(--u)*8)}
+.rec p{font-size:calc(var(--u)*15.5);line-height:1.55;color:var(--muted)}
+
+.close-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:calc(var(--u)*60)}
+.close-grid h2{color:var(--ground);font-size:calc(var(--u)*80);font-style:italic;font-weight:400}
+.close-mark{color:var(--on-deep)}
+.notes{display:flex;flex-direction:column;gap:calc(var(--u)*12);font-size:calc(var(--u)*14.5);line-height:1.55;color:var(--on-deep-2)}
+.notes .eyebrow{color:var(--accent-lt)}
+
+/* nav */
+.nav{display:flex;align-items:center;gap:12px;color:var(--on-deep-2);font-size:13px;font-variant-numeric:tabular-nums}
+.nav button{font:inherit;color:var(--on-deep);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:7px 16px;cursor:pointer}
+.nav button:hover{background:rgba(255,255,255,.16)}
+.nav button:focus-visible{outline:2px solid var(--accent-lt);outline-offset:2px}
+.nav button:disabled{opacity:.35;cursor:default}
+.dots{display:flex;gap:6px}
+.dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25)}
+.dots i.on{background:var(--accent-lt)}
+@media (max-width:520px){.dots{display:none}}
+
+@media print{
+  @page{size:13.333in 7.5in;margin:0}
+  html,body{background:#fff;padding:0;display:block}
+  .nav{display:none}
+  .deck{width:13.333in}
+  .slide,.slide[hidden]{display:block!important;border-radius:0;box-shadow:none;break-after:page;width:13.333in}
+}
+</style>
+
+<main class="deck" id="deck" aria-roledescription="presentación">
+
+<!-- ===================== 1 · COVER ===================== -->
+<section class="slide dark" aria-label="Portada">
+  <div class="in">
+    <div class="cover-grid">
+      <div class="cover-copy">
+        <span class="eyebrow">Reporte de anuncios · Facebook + Instagram</span>
+        <!-- Italicize one word. Full month: "Rendimiento de <em>agosto</em> 2026".
+             Partial period: "Primera quincena de <em>septiembre</em> 2026" or
+             "Del 1 al 20 de <em>septiembre</em> 2026". MONTH_LABEL/NEXT_MONTH_WORD follow the same logic
+             (e.g. footer "1–15 sep 2026", recommendations "para el resto de septiembre"). -->
+        <h1>Rendimiento de <em>{{MONTH_WORD}}</em> {{YEAR}}</h1>
+        <div class="rule"></div>
+        <p>Inversión, resultados por campaña y por anuncio, y recomendaciones para {{NEXT_MONTH_WORD}}.</p>
+      </div>
+      <div class="cover-mark" role="img" aria-label="{{CLIENT_NAME}}">{{LOGO_HTML}}</div>
+    </div>
+    <div class="cover-foot"><span>{{CLIENT_NAME}}</span><span>{{PERIOD_LABEL}}</span></div>
+  </div>
+</section>
+
+<!-- ===================== 2 · SUMMARY ===================== -->
+<section class="slide" aria-label="Resumen del mes" hidden>
+  <div class="in">
+    <div class="top">{{LOGO_HTML}}<span class="eyebrow">Resumen del mes</span></div>
+    <!-- Headline = the single most important fact, with one italic phrase.
+         e.g. "102 conversaciones en el <em>primer mes</em>" -->
+    <h2>{{SUMMARY_HEADLINE}}</h2>
+    <p class="lede">{{SUMMARY_LEDE}}</p>
+    <div class="kpis">
+      <!-- 4 KPIs: spend, main result count (.hero), cost per result, reach.
+           OPTIONAL sub-line under a value:
+             neutral context: <span class="d">$44.80 por día</span>
+             comparison:      <span class="d up">▲ 18% vs. julio</span>
+           "up" = better for the client, so for costs a DROP gets class "up" (green).
+           Full month vs full month: compare totals AND rates. Partial period (or a
+           prior month with partial delivery): compare RATES only (cost per result,
+           CTR, CPM, CPC). Use neutral sub-lines for totals and say why on the closing slide. -->
+      <div class="kpi"><span class="v">{{SPEND}}</span><span class="l">Inversión total</span></div>
+      <div class="kpi hero"><span class="v">{{RESULTS}}</span><span class="l">{{RESULT_LABEL_PLURAL}}</span></div>
+      <div class="kpi"><span class="v">{{COST_PER_RESULT}}</span><span class="l">Costo por {{RESULT_LABEL_SINGULAR}}</span></div>
+      <div class="kpi"><span class="v">{{REACH}}</span><span class="l">Alcance (cuentas de Meta)</span></div>
+    </div>
+    <div class="minis">
+      <div><span>Impresiones</span><span>{{IMPRESSIONS}}</span></div>
+      <div><span>Frecuencia</span><span>{{FREQUENCY}}</span></div>
+      <div><span>CPM</span><span>{{CPM}}</span></div>
+      <div><span>{{MINI_4_LABEL}}</span><span>{{MINI_4_VALUE}}</span></div>
+      <div><span>Clics (todos)</span><span>{{CLICKS}}</span></div>
+      <div><span>Clics en el enlace</span><span>{{LINK_CLICKS}}</span></div>
+      <div><span>CTR (todos)</span><span>{{CTR}}</span></div>
+      <div><span>CPC (todos)</span><span>{{CPC}}</span></div>
+    </div>
+    <div class="foot"><span>{{CLIENT_SHORT}} · Reporte de anuncios · {{MONTH_LABEL}}</span><b>02</b></div>
+  </div>
+</section>
+
+<!-- ===================== 3 · WEEKLY SPEND ===================== -->
+<section class="slide" aria-label="Gasto por semana" hidden>
+  <div class="in">
+    <div class="top">{{LOGO_HTML}}<span class="eyebrow">Ritmo de inversión</span></div>
+    <div class="cols">
+      <div class="text">
+        <h2>Gasto <em>por semana</em></h2>
+        <!-- 2 short points: spend pacing ($/day range) + CTR or cost trend -->
+        <p class="point">{{WEEKLY_POINT_1}}</p>
+        <p class="point">{{WEEKLY_POINT_2}}</p>
+      </div>
+      <div class="chart">
+        <!-- CHART GEOMETRY (viewBox 600x236):
+             buckets = Meta's 7-day buckets from the 1st (1–7, 8–14, 15–21, 22–28, 29–end).
+             Buckets with no spend are missing from the API: add them as $0 with "sin entrega".
+             SCALE_MAX = the next round number above the biggest week ($100/$200/$400/$800/$1,000...).
+             Gridlines at 0, 25, 50, 75, 100% of SCALE_MAX: y = 170, 135, 100, 65, 30.
+             bar height h = value / SCALE_MAX * 140; rect y = 170 - h.
+             Horizontal layout for N buckets (plot area x 44..590 = 546 wide):
+               slot = 546 / N;  width w = min(90, slot * 0.64);  bar x = 44 + slot*k + (slot - w)/2;  center = x + w/2
+               N=5 → slot 109.2, w 70, x = 63.6, 172.8, 282, 391.2, 500.4
+               N=4 → slot 136.5, w 87.4, x = 68.6, 205.1, 341.6, 478.1
+               N=3 → slot 182, w 90, x = 90, 272, 454
+               N=2 → slot 273, w 90, x = 135.5, 408.5
+             Use the same w in every rect (replace width="70" below).
+             Value label y = rect y - 8 (for $0 bars use y=162).
+             Sub-label per bucket: "CTR x.xx%" or "sin entrega".
+             PARTIAL BUCKETS: when any bucket is shorter than 7 days, a raw-total bar
+             looks like a collapse. Plot SPEND PER DAY instead (bucket spend / days),
+             title the slide "Gasto diario <em>por semana</em>", show "$xx.xx/día" as
+             the value label and put the total in the sub-label ("$197.29 · 3 días"). -->
+
+        <svg viewBox="0 0 600 236" role="img" aria-label="{{CHART_ARIA}}">
+          <g class="grid-line" stroke-width="1">
+            <line x1="44" y1="30" x2="590" y2="30"/><line x1="44" y1="65" x2="590" y2="65"/>
+            <line x1="44" y1="100" x2="590" y2="100"/><line x1="44" y1="135" x2="590" y2="135"/>
+          </g>
+          <line class="axis-line" x1="44" y1="170" x2="590" y2="170" stroke-width="1"/>
+          <g class="t-axis" font-size="11" text-anchor="end">
+            <text x="36" y="34">{{TICK_100}}</text><text x="36" y="69">{{TICK_75}}</text><text x="36" y="104">{{TICK_50}}</text><text x="36" y="139">{{TICK_25}}</text><text x="36" y="174">$0</text>
+          </g>
+          <g class="bar-fill">
+            <!-- REPEAT per bucket with spend > 0 -->
+            <rect x="{{X}}" y="{{Y}}" width="70" height="{{H}}" rx="2"/>
+          </g>
+          <g class="t-val" font-size="12.5" font-weight="600" text-anchor="middle">
+            <!-- REPEAT per bucket -->
+            <text x="{{CX}}" y="{{VY}}">{{WEEK_SPEND}}</text>
+          </g>
+          <g class="t-lab" font-size="12" text-anchor="middle">
+            <!-- REPEAT per bucket, e.g. "8–14 ago" -->
+            <text x="{{CX}}" y="192">{{WEEK_LABEL}}</text>
+          </g>
+          <g class="t-sub" font-size="11" text-anchor="middle">
+            <!-- REPEAT per bucket, e.g. "CTR 2.53%" or "sin entrega" -->
+            <text x="{{CX}}" y="210">{{WEEK_SUB}}</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <div class="foot"><span>{{CLIENT_SHORT}} · Reporte de anuncios · {{MONTH_LABEL}}</span><b>03</b></div>
+  </div>
+</section>
+
+<!-- ===================== 4 · BUDGET vs RESULTS ===================== -->
+<!-- Only works when every campaign has the SAME result type. With mixed result
+     types (e.g. chat + lead form), drop the right-hand cost panel and say so in the callout. -->
+<section class="slide" aria-label="Dónde rinde mejor el dinero" hidden>
+  <div class="in">
+    <div class="top">{{LOGO_HTML}}<span class="eyebrow">Por campaña</span></div>
+    <h2>¿Dónde rinde mejor <em>el dinero</em>?</h2>
+    <div class="split">
+      <div class="panel">
+        <h3>Presupuesto vs. {{RESULT_LABEL_PLURAL_LOWER}}</h3>
+        <div class="srow">
+          <div class="slabel"><span>% del presupuesto</span><span class="tnum">{{SPEND}}</span></div>
+          <div class="sbar" role="img" aria-label="{{SPEND_SHARE_ARIA}}">
+            <!-- REPEAT per campaign, same order as the legend. width = exact share %; label = rounded %.
+                 Hide the label text (leave <i></i> empty) when a share is under ~6%. -->
+            <i style="width:{{SHARE}}%;background:var(--c1)">{{SHARE_ROUNDED}}%</i>
+          </div>
+        </div>
+        <div class="srow">
+          <div class="slabel"><span>% de {{RESULT_LABEL_PLURAL_LOWER}}</span><span class="tnum">{{RESULTS}}</span></div>
+          <div class="sbar" role="img" aria-label="{{RESULT_SHARE_ARIA}}">
+            <i style="width:{{SHARE}}%;background:var(--c1)">{{SHARE_ROUNDED}}%</i>
+          </div>
+        </div>
+        <div class="legend">
+          <!-- REPEAT per campaign -->
+          <span style="--sw:var(--c1)">{{CAMPAIGN_SHORT_NAME}}</span>
+        </div>
+        <p class="callout">{{SHARE_CALLOUT}}</p>
+      </div>
+      <div class="panel">
+        <h3>Costo por {{RESULT_LABEL_SINGULAR}} <span>menor es mejor</span></h3>
+        <!-- REPEAT per campaign, sorted cheapest first. width = cost / most expensive cost * 100 -->
+        <div class="crow"><span>{{CAMPAIGN_SHORT_NAME}}</span><div class="ctrack"><b style="width:{{PCT}}%;--sw:var(--c1)"></b></div><span class="val">{{CPR}}</span></div>
+        <p class="callout">{{COST_CALLOUT}}</p>
+      </div>
+    </div>
+    <div class="foot"><span>{{CLIENT_SHORT}} · Reporte de anuncios · {{MONTH_LABEL}}</span><b>04</b></div>
+  </div>
+</section>
+
+<!-- ===================== 5 · CAMPAIGN TABLE ===================== -->
+<section class="slide" aria-label="Resultados por campaña" hidden>
+  <div class="in">
+    <div class="top">{{LOGO_HTML}}<span class="eyebrow">Por campaña</span></div>
+    <h2>Resultados <em>por campaña</em></h2>
+    <p class="lede">{{CAMPAIGN_TABLE_LEDE}}</p>
+    <table>
+      <thead><tr><th>Campaña</th><th>Presup./día</th><th>Inversión</th><th>{{RESULT_LABEL_PLURAL}}</th><th>Costo/result.</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Frecuencia</th><th>{{EXTRA_COL_LABEL}}</th></tr></thead>
+      <tbody>
+        <!-- REPEAT per campaign (sorted by cost per result, best first).
+             Mark the best value in the key columns with class="best" and the worst with class="worst".
+             Only mark columns where the difference means something.
+             Campaign not delivering at the end of the period (effective status or all ad sets
+             paused): add <span class="chip paused">pausada</span> after the name, keep its row
+             (it did spend), and leave its budget out of the TOTAL_BUDGET sum (mention that in the lede). -->
+        <tr><td><span class="dot" style="--sw:var(--c1)"></span>{{CAMPAIGN_SHORT_NAME}}</td><td>{{BUDGET}}</td><td>{{SPEND}}</td><td>{{RESULTS}}</td><td>{{CPR}}</td><td>{{CTR}}</td><td>{{CPC}}</td><td>{{CPM}}</td><td>{{FREQ}}</td><td>{{EXTRA}}</td></tr>
+        <tr class="total"><td>Total</td><td>{{TOTAL_BUDGET}}</td><td>{{SPEND}}</td><td>{{RESULTS}}</td><td>{{COST_PER_RESULT}}</td><td>{{CTR}}</td><td>{{CPC}}</td><td>{{CPM}}</td><td>{{FREQUENCY}}</td><td>{{EXTRA_TOTAL}}</td></tr>
+      </tbody>
+    </table>
+    <div class="foot"><span>{{CLIENT_SHORT}} · Reporte de anuncios · {{MONTH_LABEL}}</span><b>05</b></div>
+  </div>
+</section>
+
+<!-- ===================== 6 · ADS + META DIAGNOSIS ===================== -->
+<!-- Up to 10 ads: table.tight. 11–14 ads: table.tighter. More than 14: show the
+     top 12 by spend and add a last row "Otros N anuncios" with summed spend/results. -->
+<section class="slide" aria-label="Anuncios y diagnóstico de Meta" hidden>
+  <div class="in">
+    <div class="top">{{LOGO_HTML}}<span class="eyebrow">Por anuncio · ordenados por inversión</span></div>
+    <h2>Anuncios y <em>diagnóstico de Meta</em></h2>
+    <table class="tight">
+      <thead><tr><th>Anuncio</th><th>Inversión</th><th>Result.</th><th>Costo/result.</th><th>CTR</th><th class="diag">Diagnóstico de Meta</th></tr></thead>
+      <tbody>
+        <!-- REPEAT per ad with spend > 0, sorted by spend. Dot color = its campaign's color.
+             Chip mapping from ads_insights_auction_ranking_benchmarks:
+               "You are all good!"                  → <span class="chip good">Todo bien</span>
+               Engagement "Above Average"           → <span class="chip good">Interacción alta</span>
+               "not spurring interest"              → <span class="chip bad">Interacción baja · no genera interés</span>
+               "perceived as low quality"           → <span class="chip bad">Calidad baja</span>
+               "not producing conversions" / conversion rate below average
+                                                    → <span class="chip bad">Conversión baja</span>
+               "Not Yet Available"                  → <span class="chip na">Aún sin datos suficientes</span>
+               ad missing from the ranking output   → <span class="chip na">Sin ranking en el período</span>
+               any other diagnosis text             → translate it plainly; bad = chip bad, neutral = chip na
+             Meta's ranking compares the ad to its auction peers, NOT to this account's costs.
+             When Meta says "all good" but the ad is the account's most expensive per result
+             (roughly 2x the average or more), use <span class="chip na">Meta: normal · costo alto</span>
+             so the slide never reads as praise next to the worst number.
+             Zero results: if spend is at least the account's average cost per result, put
+             class="worst" on results and show "—" for cost. Below that (a few dollars), show 0 unmarked.
+             Ad names: drop the shared prefix (e.g. "Leads - "), fix obvious typos in the displayed
+             name only (Lazer → Láser, "-. 2" → "- 2"), and keep the variant suffix so the
+             client can find the ad in Ads Manager. -->
+        <tr><td><span class="dot" style="--sw:var(--c1)"></span>{{AD_NAME}}</td><td>{{SPEND}}</td><td>{{RESULTS}}</td><td>{{CPR}}</td><td>{{CTR}}</td><td class="diag">{{CHIP}}</td></tr>
+      </tbody>
+    </table>
+    <div class="foot"><span>{{CLIENT_SHORT}} · Reporte de anuncios · {{MONTH_LABEL}}</span><b>06</b></div>
+  </div>
+</section>
+
+<!-- ===================== 7 · FINDINGS ===================== -->
+<section class="slide" aria-label="Hallazgos" hidden>
+  <div class="in">
+    <div class="top">{{LOGO_HTML}}<span class="eyebrow">Hallazgos</span></div>
+    <h2>Lo que nos dicen <em>los números</em></h2>
+    <div class="grid2">
+      <!-- EXACTLY 4 cards. .big = the one number that proves the point. -->
+      <div class="card"><span class="big">{{FINDING_NUMBER}}</span><h3>{{FINDING_TITLE}}</h3><p>{{FINDING_BODY}}</p></div>
+    </div>
+    <div class="foot"><span>{{CLIENT_SHORT}} · Reporte de anuncios · {{MONTH_LABEL}}</span><b>07</b></div>
+  </div>
+</section>
+
+<!-- ===================== 8 · RECOMMENDATIONS ===================== -->
+<section class="slide" aria-label="Recomendaciones para {{NEXT_MONTH_WORD}}" hidden>
+  <div class="in">
+    <div class="top">{{LOGO_HTML}}<span class="eyebrow">Próximos pasos · en orden de impacto</span></div>
+    <h2>Recomendaciones para <em>{{NEXT_MONTH_WORD}}</em></h2>
+    <div class="recs">
+      <!-- 4 recommendations (2x2), or 6 (2x3) if the appointment rec is included and there's
+           a real 5th. Use an even count so the grid has no gap. -->
+      <div class="rec"><span class="n">1</span><div><h3>{{REC_TITLE}}</h3><p>{{REC_BODY}}</p></div></div>
+    </div>
+    <div class="foot"><span>{{CLIENT_SHORT}} · Reporte de anuncios · {{MONTH_LABEL}}</span><b>08</b></div>
+  </div>
+</section>
+
+<!-- ===================== 9 · CLOSING ===================== -->
+<section class="slide dark" aria-label="Cierre" hidden>
+  <div class="in">
+    <div class="close-grid">
+      <div class="cover-copy">
+        <div class="close-mark">{{LOGO_HTML}}</div>
+        <h2>Gracias</h2>
+      </div>
+      <div class="notes">
+        <span class="eyebrow">Sobre los datos</span>
+        <p>Fuente: Meta Ads, cuenta {{CLIENT_NAME}}, del {{PERIOD_SENTENCE}} (zona horaria de la cuenta).</p>
+        <p>{{RESULT_DEFINITION_NOTE}}</p>
+        <p>{{CONTEXT_NOTE}}</p>
+      </div>
+    </div>
+    <div class="cover-foot"><span>{{CLIENT_NAME}}</span><span>Reporte de anuncios · {{MONTH_LABEL}}</span></div>
+  </div>
+</section>
+
+</main>
+
+<nav class="nav" aria-label="Controles de la presentación">
+  <button id="prev" type="button" aria-label="Diapositiva anterior">← Anterior</button>
+  <span id="count" aria-live="polite">1 / 9</span>
+  <span class="dots" id="dots" aria-hidden="true"></span>
+  <button id="next" type="button" aria-label="Diapositiva siguiente">Siguiente →</button>
+</nav>
+
+<script>
+(function(){
+  const slides=[...document.querySelectorAll('.slide')];
+  const prev=document.getElementById('prev'), next=document.getElementById('next'), count=document.getElementById('count'), dots=document.getElementById('dots');
+  slides.forEach(()=>dots.appendChild(document.createElement('i')));
+  let i=0;
+  function show(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach((s,k)=>{s.hidden=k!==i});
+    count.textContent=(i+1)+' / '+slides.length;
+    [...dots.children].forEach((d,k)=>d.classList.toggle('on',k===i));
+    prev.disabled=i===0; next.disabled=i===slides.length-1;
+  }
+  prev.addEventListener('click',()=>show(i-1));
+  next.addEventListener('click',()=>show(i+1));
+  document.addEventListener('keydown',e=>{
+    if(['ArrowRight','PageDown',' '].includes(e.key)){e.preventDefault();show(i+1)}
+    else if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();show(i-1)}
+    else if(e.key==='Home'){show(0)} else if(e.key==='End'){show(slides.length-1)}
+  });
+  let x0=null; const deck=document.getElementById('deck');
+  deck.addEventListener('touchstart',e=>{x0=e.touches[0].clientX},{passive:true});
+  deck.addEventListener('touchend',e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>40)show(i+(dx<0?1:-1));x0=null});
+  show(0);
+})();
+</script>

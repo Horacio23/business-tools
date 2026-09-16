@@ -13,6 +13,7 @@ Custom [Claude Code](https://docs.claude.com/en/docs/claude-code) skills for run
 | `ghl-chat-widget` | Read & recolor GHL chat widgets to match brand colors |
 | `ghl-cadence` | Convert a cadence doc (Word/PDF) into GHL AI Workflow Builder prompts |
 | `resell-sequence` | Build the 12-month monthly resell email series (Full System) |
+| `meta-ads-report` | Monthly Meta ads breakdown for a client → branded Spanish slide-deck Artifact (data pulls, findings, recommendations) |
 
 ## Install on a new machine
 
