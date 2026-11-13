@@ -15,6 +15,7 @@
 !/ghl-cadence/
 !/resell-sequence/
 !/meta-ads-report/
+!/vibe-edit/
 
 # Never commit secrets or OS junk if they ever appear inside a skill folder.
 **/.DS_Store

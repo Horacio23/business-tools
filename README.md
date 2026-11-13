@@ -14,6 +14,7 @@ Custom [Claude Code](https://docs.claude.com/en/docs/claude-code) skills for run
 | `ghl-cadence` | Convert a cadence doc (Word/PDF) into GHL AI Workflow Builder prompts |
 | `resell-sequence` | Build the 12-month monthly resell email series (Full System) |
 | `meta-ads-report` | Monthly Meta ads breakdown for a client → branded Spanish slide-deck Artifact (data pulls, findings, recommendations) |
+| `vibe-edit` | Talking-head footage → finished on-brand vertical reels: transcribe, pick, cut pauses/fillers, face-framed 9:16 + punch-ins, branded word-by-word captions, ducked music at -14 LUFS, 6 QA gates (Windows-native take on the Vibe Editing playbook) |
 
 ## Install on a new machine
 
