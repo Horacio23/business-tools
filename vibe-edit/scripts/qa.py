@@ -66,8 +66,10 @@ def main() -> None:
     bj = Path(sys.argv[1])
     m = json.loads(bj.read_text(encoding="utf-8"))
     brand = json.loads(Path(m["brand"]).read_text(encoding="utf-8"))
-    length = {"min": 15, "max": 60, **brand.get("length", {})}
-    lufs = brand.get("audio", {}).get("lufs", -14)
+    # effective targets (style + profile) are written by build_clip.py; older manifests fall back to the profile
+    length = {"min": 15, "max": 60, **(m.get("length") or brand.get("length", {}))}
+    lufs = m.get("lufs", brand.get("audio", {}).get("lufs", -14))
+    music_sep = m.get("qa_min_voice_over_music_db", 10)
     final = Path(m["final"])
     work = bj.parent
 
@@ -99,12 +101,14 @@ def main() -> None:
     tp = float(tps[-1]) if tps and tps[-1] != "-inf" else -99
     st = "PASS" if abs(I - lufs) <= 1.5 and tp <= -1.0 else "FAIL"
     gate("2 AUDIO loudness", st, f"{I:.1f} LUFS (target {lufs}), true peak {tp:.1f} dBTP")
-    head, tail = m["first_word_at"], dur - m["last_word_end"]
+    head, tail = m["first_word_at"], m.get("content_end", dur) - m["last_word_end"]
+    card = m.get("end_card_seconds") or 0
     gate("2 AUDIO open", "PASS" if head <= 0.35 else "FAIL",
          f"first word at {head:.2f}s" + ("" if head <= 0.35 else " (dead air or fluff before the hook)"))
     gate("2 AUDIO close", "PASS" if 0.03 <= tail <= 0.9 else "WARN",
          f"{tail:.2f}s after the last word" + (" (last word may be clipped)" if tail < 0.03 else
-                                               " (long tail)" if tail > 0.9 else ""))
+                                               " (long tail)" if tail > 0.9 else "")
+         + (f", then a {card:.1f}s end card" if card else ""))
     sr = 16000
     x = load_audio(final, sr)
     pops = []
@@ -125,8 +129,9 @@ def main() -> None:
                 gaps.append(x[int((e0 + 0.1) * sr):int((s1 - 0.1) * sr)])
         if gaps:
             sep = rms_db(speech) - rms_db(np.concatenate(gaps))
-            st = "PASS" if sep >= 10 else "WARN" if sep >= 6 else "FAIL"
-            gate("2 AUDIO music bed", st, f"voice sits {sep:.1f} dB over the music in pauses (want >= 10)")
+            st = "PASS" if sep >= music_sep else "WARN" if sep >= music_sep - 4 else "FAIL"
+            gate("2 AUDIO music bed", st,
+                 f"voice sits {sep:.1f} dB over the music in pauses (want >= {music_sep} for this style)")
         else:
             gate("2 AUDIO music bed", "NOTE", "no pause long enough to measure; listen to it")
 
@@ -136,7 +141,8 @@ def main() -> None:
     gate("3 VISUAL black", "FAIL" if blacks else "PASS",
          f"black frames at {', '.join(blacks)}s" if blacks else "no black frames")
     fz = ffmpeg_stderr(["-i", str(final), "-vf", "freezedetect=n=-60dB:d=1.5", "-an", "-f", "null", "-"])
-    freezes = re.findall(r"freeze_start: ([\d.]+)", fz)
+    content_end = m.get("content_end", dur)  # the end card is a still on purpose
+    freezes = [f for f in re.findall(r"freeze_start: ([\d.]+)", fz) if float(f) < content_end - 0.2]
     gate("3 VISUAL freeze", "WARN" if freezes else "PASS",
          f"frozen picture from {', '.join(freezes)}s" if freezes else "no frozen stretches")
     W, H = m["source_size"]
@@ -145,7 +151,7 @@ def main() -> None:
         if f["found"] < 0.6:
             face_notes.append(f"segment {seg}: face found in {f['found']:.0%} of samples (framing is a centered guess)")
             worst = "WARN" if worst == "PASS" else worst
-        zooms = [p["zoom"] for p in m["pieces"] if str(p["seg"]) == seg]
+        zooms = [p["zoom"] for p in (m.get("shots") or m["pieces"]) if str(p["seg"]) == seg]
         if f["area"] and zooms:
             base_frac = ((H * 1080 / 1920) * H) / (W * H) if W / H > 1080 / 1920 else (W * W * 1920 / 1080) / (W * H)
             out_area = f["area"] / (base_frac / max(zooms) ** 2)
@@ -157,7 +163,7 @@ def main() -> None:
                 worst = "WARN" if worst == "PASS" else worst
     gate("3 VISUAL framing", worst, "; ".join(face_notes) or "face found and framed in every segment")
     # contact sheet: open, each cut, close
-    times = [0.3] + [s + 0.15 for s in m["seams"]][:14] + [max(dur - 0.3, 0)]
+    times = [0.3] + [s + 0.15 for s in sorted(m["seams"] + m.get("zoom_cuts", []))][:16] + [max(dur - 0.3, 0)]
     tiles = []
     for t in times:
         raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", str(final), "-frames:v", "1",
@@ -177,28 +183,64 @@ def main() -> None:
 
     # 4 CAPTIONS -----------------------------------------------------------
     caps, notes, st = m["captions"], [], "PASS"
-    wide = [c["text"] for c in caps if c["width_px"] > m["max_line_px"]]
+    lines = m.get("caption_lines") or [{"text": c["text"], "width_px": c["width_px"], "y": m["caption_y"],
+                                        "size": m["caption_size"], "start": c["start"], "end": c["end"]} for c in caps]
+    # the style's safe zone (e.g. Meta's ad zone: 269-1248, 65px sides), else the 220-1500 band
+    zone = m.get("safe_zone") or {"top": 220, "bottom": 1500, "side": 0}
+    zname = (f"Meta's ad safe zone (y {zone['top']}-{zone['bottom']}, {zone['side']}px sides)" if m.get("safe_zone")
+             else f"the {zone['top']}-{zone['bottom']} safe band")
+    max_w = min(m["max_line_px"], 1080 - 2 * zone["side"]) if zone.get("side") else m["max_line_px"]
+    wide = [ln["text"] for ln in lines if ln["width_px"] > max_w]
     if wide:
-        notes.append(f"{len(wide)} line(s) wider than {m['max_line_px']}px: {wide[:3]}")
+        notes.append(f"{len(wide)} line(s) wider than {max_w}px: {wide[:3]}")
         st = "FAIL"
-    cap_top = m["caption_y"] - m["caption_size"] * 0.6
-    on_face = [p for p in m["pieces"] if p.get("chin_y") and cap_top < p["chin_y"] - 5]
-    if on_face:
-        notes.append(f"captions overlap the chin/mouth in {len(on_face)} shot(s) "
-                     f"(caption top {cap_top:.0f}px, chin {max(p['chin_y'] for p in on_face)}px)")
-        st = "WARN" if st == "PASS" else st
-    half = m["caption_size"] * 0.6
-    if not (220 <= m["caption_y"] - half and m["caption_y"] + half <= 1500):
-        notes.append(f"caption band y={m['caption_y']} leaves the 220-1500 safe zone")
+    cap_top = min(ln["y"] - ln["size"] * 0.6 for ln in lines) if lines else m["caption_y"]
+    cap_bot = max(ln["y"] + ln["size"] * 0.6 for ln in lines) if lines else m["caption_y"]
+    cutaways = m.get("broll") or []
+    shots = [p for p in (m.get("shots") or m["pieces"])
+             if not any(b["start"] <= p["out_start"] and p["out_end"] <= b["end"] for b in cutaways)]
+    if m.get("caption_place") == "above":
+        # captions above the head: covering the brow/eyes is a problem, grazing the hair is only noted
+        on_head = [p for p in shots if p.get("head_top_y") is not None and cap_bot > p["head_top_y"] + 5]
+        on_eyes = [p for p in on_head if p.get("face_top_y") is None or cap_bot > p["face_top_y"]]
+        if on_eyes:
+            notes.append(f"captions overlap the face in {len(on_eyes)} shot(s) "
+                         f"(caption bottom {cap_bot:.0f}px, brow {min(p['face_top_y'] for p in on_eyes)}px)")
+            st = "WARN" if st == "PASS" else st
+        elif on_head:
+            notes.append(f"caption block grazes the hair in {len(on_head)} shot(s), face clear")
+    else:
+        on_face = [p for p in shots if p.get("chin_y") and cap_top < p["chin_y"] - 5]
+        # mouth_y (newer builds): covering the mouth is a real problem; touching the chin on a punched-in
+        # shot is normal for close-up reels and is only noted
+        on_mouth = [p for p in on_face if p.get("mouth_y") is None or cap_top < p["mouth_y"]]
+        if on_mouth:
+            notes.append(f"captions overlap the chin/mouth in {len(on_mouth)} shot(s) "
+                         f"(caption top {cap_top:.0f}px, chin {max(p['chin_y'] for p in on_mouth)}px)")
+            st = "WARN" if st == "PASS" else st
+        elif on_face:
+            notes.append(f"caption block touches the chin in {len(on_face)} punched-in shot(s), mouth clear "
+                         f"(caption top {cap_top:.0f}px, chin up to {max(p['chin_y'] for p in on_face)}px)")
+    inside = lambda b: zone["top"] <= b["y"] - b["size"] * 0.6 and b["y"] + b["size"] * 0.6 <= zone["bottom"]  # noqa: E731
+    out_band = sorted({ln["y"] for ln in lines if not inside(ln)})
+    if out_band:
+        notes.append(f"caption line(s) at y={out_band[:4]} leave {zname}")
+        st = "FAIL"
+    out_hook = [b["text"] for b in m.get("hook_boxes") or [] if not inside(b) or b["width_px"] > 1080 - 2 * zone["side"]]
+    if out_hook:
+        notes.append(f"hook line(s) {out_hook} leave {zname}")
         st = "FAIL"
     flick = [c["text"] for c in caps if c["end"] - c["start"] < 0.15]
     if flick:
         notes.append(f"{len(flick)} caption(s) on screen < 0.15s")
         st = "WARN" if st == "PASS" else st
-    if m.get("hook_lines") and len(m["hook_lines"]) > 2:
-        notes.append(f"hook title wraps to {len(m['hook_lines'])} lines (keep it to 2)")
+    max_hook = 3 if m.get("hook_kind") == "two-tier" else 2
+    if m.get("hook_lines") and len(m["hook_lines"]) > max_hook:
+        notes.append(f"hook title wraps to {len(m['hook_lines'])} lines (keep it to {max_hook})")
         st = "WARN" if st == "PASS" else st
-    gate("4 CAPTIONS", st, "; ".join(notes) or f"{len(caps)} caption lines inside the safe zone")
+    where = f"{len(caps)} caption lines" + (" and the hook" if m.get("hook_boxes") else "") + f" inside {zname}" \
+        + (", captions above the head" if m.get("caption_place") == "above" else "")
+    gate("4 CAPTIONS", st, "; ".join(notes + ([where] if st == "PASS" else [])))
 
     # 5 SCRIPT (quick checks; full audit = fresh subagent) ------------------
     words = [w["text"] for w in m["words"]]

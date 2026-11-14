@@ -1,0 +1,18 @@
+{
+  "name": "karaoke",
+  "description": "The original vibe-edit look: big heavy captions, 3 words at a time, the spoken word lights up in the brand colour; a boxed hook title for the first 3 s; tight punch-ins; quiet music. Built for punchy talking-head reels.",
+  "caption": {
+    "mode": "karaoke",
+    "font_file": ["C:/Windows/Fonts/ariblk.ttf", "/System/Library/Fonts/Supplemental/Arial Black.ttf"],
+    "size": 78, "uppercase": false, "words_per_chunk": 3, "max_line_px": 800,
+    "color": "#FFFFFF", "highlight": "#FFD400", "outline": "#000000", "outline_px": 7, "shadow_px": 0,
+    "y": "auto", "strip_punctuation": true, "pop": true
+  },
+  "hook_title": {"enabled": true, "kind": "box", "size": 62, "color": "#FFFFFF", "box": "#000000", "y": 430,
+                 "seconds": 3.0},
+  "end_card": {"enabled": false},
+  "grade": {"enabled": false},
+  "music": {"volume_db": -22, "duck": true},
+  "edit": {"punch_in": 1.12},
+  "qa": {"min_voice_over_music_db": 10}
+}

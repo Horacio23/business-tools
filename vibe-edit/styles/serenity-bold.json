@@ -1,0 +1,31 @@
+{
+  "name": "serenity-bold",
+  "description": "The simpler Serenity variant (the editor's Oct 17 re-delivery the client chose): same small white word-by-word captions, end card, grade and music as 'serenity', but the key word is set big in the same bold sans instead of an italic serif. Reads cleaner on busy backgrounds.",
+  "caption": {
+    "mode": "reveal",
+    "font_file": ["C:/Windows/Fonts/arialbd.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"],
+    "size": 76, "uppercase": false, "words_per_chunk": 4, "max_line_px": 800,
+    "color": "#FFFFFF", "outline": "#000000", "outline_px": 2, "outline_opacity": 0.45, "blur": 5,
+    "shadow_px": 2, "shadow_color": "#000000", "shadow_opacity": 0.45,
+    "y": "auto", "y_pref": 1150, "strip_punctuation": "light", "fade_ms": 120,
+    "emphasis": {
+      "enabled": true,
+      "font_file": ["C:/Windows/Fonts/arialbd.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"],
+      "size": 168, "color": "#FFFFFF", "uppercase": false, "every_s": 1.8, "min_len": 6, "line_scale": 0.85
+    }
+  },
+  "hook_title": {"enabled": false},
+  "end_card": {
+    "enabled": true, "seconds": 2.0, "background": ["#F4F4F4", "#D9D9D9"],
+    "logo_width": 610, "logo_y": 946, "lines_y": 1402, "line_gap": 125,
+    "text_font": ["C:/Windows/Fonts/arialbd.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"],
+    "text_size": 68, "small_size": 34, "text_color": "#FFFFFF", "label_color": "#C9A54E", "icon_height": 98,
+    "shadow": true, "shadow_offset": [5, 8], "shadow_blur": 6, "shadow_opacity": 0.6,
+    "fade_in": 0.35, "fade_color": "white"
+  },
+  "grade": {"enabled": true, "target_luma": 150, "contrast": 0.95, "saturation": 0.95, "black_lift": 0.04,
+            "temperature": 6300},
+  "music": {"volume_db": -17, "duck": true},
+  "edit": {"punch_in": 1.08},
+  "qa": {"min_voice_over_music_db": 6}
+}

@@ -1,0 +1,36 @@
+{
+  "name": "serenity-naples",
+  "description": "The Serenity Naples look (Nov 2026 reels): small ALL-CAPS white captions low on the frame, key words as big gold ALL-CAPS, a two-tier hook in the first seconds (small serif caps over one big gold word, e.g. 'SI TE HAS PUESTO / BOTOX'), and a 3 s end card with the gold logo and contact lines in gold on warm white. Write hook_title as 'small part | BIG WORD'.",
+  "caption": {
+    "mode": "reveal",
+    "font_file": ["C:/Windows/Fonts/arialbd.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"],
+    "size": 42, "uppercase": true, "words_per_chunk": 3, "max_line_px": 800,
+    "color": "#FFFFFF", "outline": "#000000", "outline_px": 2, "outline_opacity": 0.5, "blur": 4,
+    "shadow_px": 2, "shadow_color": "#000000", "shadow_opacity": 0.5,
+    "y": "auto", "y_pref": 1340, "strip_punctuation": "light", "fade_ms": 100,
+    "emphasis": {
+      "enabled": true,
+      "font_file": ["C:/Windows/Fonts/arialbd.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"],
+      "size": 121, "color": "#F4CE3C", "uppercase": true, "every_s": 2.4, "min_len": 6, "line_scale": 0.95
+    }
+  },
+  "hook_title": {
+    "enabled": true, "kind": "two-tier", "seconds": 2.6,
+    "small_font_file": ["C:/Windows/Fonts/BOD_R.TTF", "/System/Library/Fonts/Supplemental/Georgia.ttf"],
+    "small_size": 74, "small_color": "#FFFFFF", "small_y": 340,
+    "font_file": ["C:/Windows/Fonts/arialbd.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"],
+    "size": 212, "big_color": "#F4CE3C", "big_y": 470, "big_max_px": 900, "uppercase": true
+  },
+  "end_card": {
+    "enabled": true, "seconds": 3.0, "background": "#FAF7F4",
+    "logo_width": 380, "logo_y": 880, "lines_y": 1250, "line_gap": 80,
+    "text_font": ["C:/Windows/Fonts/GOTHIC.TTF", "/System/Library/Fonts/Supplemental/Arial.ttf"],
+    "text_size": 74, "small_size": 32, "text_color": "#B5893A", "label_color": "#B5893A", "icon_height": 80,
+    "shadow": false, "fade_in": 0.35, "fade_color": "white"
+  },
+  "grade": {"enabled": true, "target_luma": 145, "contrast": 0.97, "saturation": 1.0, "black_lift": 0.02,
+            "temperature": 6300},
+  "music": {"volume_db": -18, "duck": true},
+  "edit": {"punch_in": 1.06},
+  "qa": {"min_voice_over_music_db": 6}
+}

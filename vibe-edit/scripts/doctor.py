@@ -82,6 +82,22 @@ def main() -> None:
             n = len([p for p in md.glob("*") if p.suffix.lower() in {".mp3", ".wav", ".m4a"}]) if md.exists() else 0
             line(n > 0, f"music beds: {n} in {md}", "clips will build without music until tracks are added")
 
+    # every style's fonts (a style lists the Windows path, then the Mac fallback)
+    styles_dir = Path(__file__).resolve().parent.parent / "styles"
+    for sp in sorted(styles_dir.glob("*.json")):
+        st = json.loads(sp.read_text(encoding="utf-8"))
+        cap, hk, ec = st.get("caption", {}), st.get("hook_title", {}), st.get("end_card", {})
+        wanted = [cap.get("font_file"), (cap.get("emphasis") or {}).get("font_file"), hk.get("font_file"),
+                  hk.get("small_font_file"), ec.get("text_font")]
+        got, missing = [], []
+        for ff_ in filter(None, wanted):
+            try:
+                got.append(Path(resolve_font(ff_, styles_dir)).name)
+            except SystemExit:
+                missing.append(ff_[0] if isinstance(ff_, list) else ff_)
+        line(not missing, f"style '{sp.stem}' fonts: {', '.join(dict.fromkeys(got)) or 'defaults'}",
+             f"missing {missing}: add this computer's path to the style's font lists")
+
     print("READY" if ok_all else "Not fully ready: fix the MISS lines (an optional MISS still lets you edit).")
     sys.exit(0 if ok_all else 1)
 

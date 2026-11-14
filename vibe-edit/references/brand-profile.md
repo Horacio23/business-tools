@@ -1,15 +1,31 @@
 # Brand profile: `video-style.json`
 
-One file per brand. It holds the visual taste and edit habits, so every clip comes out in that brand's
-look. Relative paths resolve from the file's own folder. Anything left out falls back to the defaults
-in `scripts/build_clip.py` (`DEFAULTS`). A working example is the agency's own profile in the vault,
-`machine/vibe-edit/video-style.json`. It's kept there so git syncs it to every computer.
+One file per brand. It holds the brand's identity and its taste, so every clip comes out looking like
+theirs. Relative paths resolve from the file's own folder. Anything left out falls back to the chosen
+**style** ([styles.md](styles.md)), then to the defaults in `scripts/build_clip.py` (`DEFAULTS`).
+Working examples: the agency's profile in the vault, `machine/vibe-edit/video-style.json`, kept there so
+git syncs it to every computer, and Serenity's `Clients/Serenity Medical Spa/video-style.json`.
+
+**Identity vs look.** `language`, `logo`, `contact`, `audio`, `length`, `compliance` and the music
+folder are identity: they apply whatever style is used. `caption`, `hook_title`, `edit`, `grade`,
+`end_card` and the music level are look: in the profile they tune the brand's own `"style"`. To tune
+another style for this brand, put the same keys under `"styles": {"<style>": {...}}`.
 
 ```jsonc
 {
   "brand": "Example Med Spa",
+  "style": "serenity",                    // default look: karaoke | serenity | serenity-bold | serenity-naples
   "language": "es",
   "audience": "who watches: e.g. Spanish-speaking women 30-60 considering aesthetic treatments",
+  "contact": {                            // the end card (styles that have one)
+    "logo": "video-brand/logo.png",
+    "lines": [
+      {"icon": "video-brand/icon-whatsapp.png", "text": "+1 305-555-0100"},
+      {"label": "SMS", "text": "+1 786-555-0101"},
+      {"text": "2371 Example Rd, Naples FL", "small": true}
+    ]
+  },
+  "styles": {"serenity-naples": {"contact": {"logo": "video-brand/logo-naples.png", "lines": []}}},
   "caption": {
     "font_file": "fonts/DMSans-Bold.ttf",   // static TTF/OTF, or a list of paths (first that exists wins)
     "size": 76,                           // px at 1080x1920; 70-84 reads well
