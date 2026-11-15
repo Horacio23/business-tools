@@ -1,6 +1,6 @@
 ---
 name: vibe-edit
-description: Edit talking-head videos into finished, on-brand vertical reels (9:16) by conversation. It transcribes, picks the strongest moments, cuts pauses, fillers and dead air, frames the face, punches in on cuts, burns word-by-word captions, adds a hook title, B-roll cutaways and an end card, mixes ducked music to -14 LUFS, then runs 6 quality gates before showing anything. Looks come from named styles (accent, karaoke, serenity, serenity-bold, serenity-naples) worn by any brand profile; accent (big colored key words, zoom cut every few seconds) is the agency default. Use it whenever the user wants a video edited, cut, captioned or turned into reels, shorts or TikToks: "edit this video", "make clips from this", "turn this into reels", "add subtitles", "cut the pauses", "polish this reel", "do it in the serenity style", "edita este video", "hazme reels de esto", "ponle subtítulos", "con el estilo de Serenity". Covers the agency's own content and client footage (med spas, salons). Also use it for changes to a clip already made ("captions bigger", "different song", "cut that line", "other style"), and for making a new style from someone's finished videos.
+description: Edit talking-head videos into finished, on-brand vertical reels (9:16) by conversation. It transcribes, picks the strongest moments, cuts pauses, fillers and dead air, frames the face, punches in on cuts, burns word-by-word captions, adds a hook title (including big text behind the speaker's head), B-roll cutaways, sound effects and an end card, mixes ducked music to -14 LUFS, then runs 6 quality gates before showing anything. Looks come from named styles (punch, karaoke, serenity, serenity-bold, serenity-naples) worn by any brand profile; punch (big colored key words, zoom cut every few seconds, text-behind-the-head hook, whooshes and pops) is the agency default. Use it whenever the user wants a video edited, cut, captioned or turned into reels, shorts or TikToks: "edit this video", "make clips from this", "turn this into reels", "add subtitles", "cut the pauses", "polish this reel", "do it in the serenity style", "edit this in Punch", "edita este video", "hazme reels de esto", "ponle subtítulos", "con el estilo de Serenity". Covers the agency's own content and client footage (med spas, salons). Also use it for changes to a clip already made ("captions bigger", "different song", "cut that line", "other style"), and for making a new style from someone's finished videos.
 ---
 
 # Vibe Edit
@@ -29,8 +29,11 @@ Human-facing docs (how-to, rules, brand profiles) are in the business vault: "Vi
 always for the Maria avatar (vault: Customer Avatar - Maria), in Spanish unless told otherwise.
 
 ## First run on a computer
-Run `uv run scripts/doctor.py`. It checks ffmpeg (with libass), the ElevenLabs key, the agency brand
-profile, its fonts and its music, and prints the fix for anything missing.
+Run `uv run scripts/doctor.py`. It checks ffmpeg (with libass), the ElevenLabs key, npx and the person
+cut-out model (for the text-behind-the-head hook), the agency brand profile, its fonts and its music, and
+prints the fix for anything missing. The cut-out model is a one-time 176 MB download (MIT, rembg's GitHub
+releases): ask the user before running the command doctor prints. Until it's there, `depth` hooks fall
+back to the two-tier hook on their own.
 - **Mac:** `brew install uv ffmpeg`.
 - **Windows:** `winget install astral-sh.uv Gyan.FFmpeg`.
 
@@ -59,7 +62,7 @@ The user's taste lives in this file. That's why their clips look like theirs and
 The **style** is the look, separate from the brand ([references/styles.md](references/styles.md)):
 | Style | In one line |
 |---|---|
-| `accent` | **Cyber Popular's default**: word-by-word captions, numbers and stressed words big in cyan with a blue glow, two-tier hook, zoom cut every ~3 s or at each new sentence, everything inside Meta's ad safe zone, no end card |
+| `punch` | **Cyber Popular's default**: word-by-word captions, numbers and stressed words big in cyan with a blue glow, a **depth hook** (giant word rising from behind the head), zoom cut every ~3 s or at each new sentence, whooshes on zoom cuts and pops on key words, everything inside Meta's ad safe zone, no end card |
 | `karaoke` | big captions, active word in colour, boxed hook (the fallback when a profile names no style) |
 | `serenity` | small white captions at chest height + one italic-serif key word, B-roll, gold-logo end card |
 | `serenity-bold` | same, key word in big bold sans |
@@ -69,6 +72,11 @@ Use the profile's `"style"` unless the user names one ("en el estilo Serenity").
 sure, render the same cut in two styles and let them pick. If they want a look none of these covers
 ("make it like this account's reels"), make a new style from those videos: steps at the end of
 styles.md.
+
+**A style the user has named is kept as it is.** Punch ("edit this in Punch") is the user's keeper. To
+try a different type of edit, copy the closest style to a new file under a new name and change the
+copy. Never edit a named style to run an experiment. Change it only when the user asks for that
+style to change ("Punch with softer whooshes"). `accent` is Punch's old name and still loads it.
 
 ### 3. Transcribe (cached)
 ```
@@ -85,12 +93,18 @@ Read [references/editing-rules.md](references/editing-rules.md) and apply it: pa
 context, one arc, finish the point, the brand person carries it. For each clip write:
 - the **hook line** (the first words heard),
 - a **hook title**: on-screen text, at most 2 lines and about 40 characters, Spanish for Maria
-  (`serenity` has none; `accent` and `serenity-naples` want `"small part | BIG WORD"`, e.g.
-  `"Tienes | 300 segundos"`),
+  (`serenity` has none; `serenity-naples` wants `"small part | BIG WORD"`). `punch` wants
+  `"top line | BIG | label"`, e.g. `"Tienes | 300 | segundos"`:
+  - BIG goes **behind the head**. Make it ONE short word or number (≤ ~6 characters) that still reads
+    with its lower third hidden: a number is ideal.
+  - When BIG would be too long or too small, the builder falls back to the two-tier hook. It also does
+    this when the head is too high in the frame or the cut-out model is missing.
+  - `"hook_kind": "two-tier"` in the clip forces the plain hook.
+  - One behind-the-head moment per video. More than that and it stops working as a pattern interrupt.
 - the **segments** as word-index ranges,
 - the **length**,
-- for the reveal styles (`accent`, serenity): the **key words** (`"emphasis"`, word ids). Numbers are
-  automatic in `accent`, and so are the words the speaker leans on (measured from the audio). Add the
+- for the reveal styles (`punch`, serenity): the **key words** (`"emphasis"`, word ids). Numbers are
+  automatic in `punch`, and so are the words the speaker leans on (measured from the audio). Add the
   payoff word of a sentence the audio misses, e.g. "velocidad" in "la velocidad es el nuevo servicio al
   cliente". For serenity: the treatment, the body area, the benefit, about one every 2 s.
 - any **B-roll** (`"broll"`: treatment, product, screen or stock clips, 1.5–3 s, placed on the words
@@ -110,17 +124,26 @@ It does these steps in order, and the order matters:
 1. Snap cuts to word edges, drop fillers, and close pauses over `edit.max_pause` (jump cuts).
 2. Lock a face-centred 9:16 frame per segment, with no panning inside a shot.
 3. Alternate a punch-in on each cut (1.12× karaoke, ~1.07× serenity), so the jump cuts read as intentional.
-   Styles with `edit.rhythm` (`accent`) also cut the zoom inside a long take: at each sentence end, or
+   Styles with `edit.rhythm` (`punch`) also cut the zoom inside a long take: at each sentence end, or
    at the first word gap after ~3 s, cycling wide → 1.12× → wide → ~1.24×. The tightest level is capped
    so the face never fills more than ~15% of the frame. The audio is untouched.
 4. Apply the style's grade, and add 30 ms audio fades at every cut.
-5. Append the style's end card, if it has one (brand logo + contact lines). `accent` has none: the
+5. Append the style's end card, if it has one (brand logo + contact lines). `punch` has none: the
    video ends right after the last word.
-6. Clean up the voice, add music ducked under it, and run two-pass loudnorm to -14 LUFS.
-7. Lay in the B-roll cutaways and the logo, then burn the captions and hook **last** so nothing covers them.
+6. Clean up the voice and add music ducked under it (`mix_base.wav`).
+7. A `depth` hook cuts the speaker out of the hook seconds with HyperFrames (`remove-background`, ~25 s
+   on a CPU). The builder measures the top of the head from the cut-out and places BIG so the head hides
+   ~30% of it. BIG is drawn first, then the cut-out of the speaker goes over it.
+8. Sound effects (`sfx`, synthesized in `scripts/sfx.py`, nothing to license):
+   - a riser and hit as the hook lands;
+   - a whoosh peaking 1 frame before zoom cuts and B-roll cuts, sentence ends first, at most one per 3 s;
+   - a soft pop when a key word lands.
+
+   Levels are set against the voice. Then two-pass loudnorm of the whole mix runs to -14 LUFS.
+9. Lay in the B-roll cutaways and the logo, then burn the captions and hook **last** so nothing covers them.
 
 Captions find their height automatically (`caption.y: "auto"`): just under the chin for karaoke, at
-chest height for serenity (pushed down on tight shots). `accent` keeps every caption and the hook inside
+chest height for serenity (pushed down on tight shots). `punch` keeps every caption and the hook inside
 Meta's ad safe zone (`caption.safe_zone`), so any video can run as an ad. On a medium shot that's under
 the chin. On a tight close-up the captions go above the head, and punch-ins grow downward from the top
 of the head (details in styles.md). When the user is recording for ads or for us, suggest chest-up
@@ -161,6 +184,8 @@ Feedback comes in plain words. Route it to the right place, rebuild, and re-run 
 | "that word shouldn't be big", "highlight X" | the clip's `"emphasis"` word ids (adds to the automatic picks); `"emphasis_auto": false` = only the listed words and numbers |
 | "fewer / more big words" | `emphasis.stress_min` (higher = fewer), `emphasis.every_s`, `emphasis.max_gap_s` |
 | "zoom more / less often" | `edit.rhythm.every_s`, `edit.rhythm.at_sentence`, `edit.rhythm.zooms`; `rhythm.enabled: false` = cut-only punch-ins |
+| "sound effects louder / softer", "fewer whooshes", "no pops" | `sfx.whoosh_db` / `pop_db` / `hit_db` (dB vs the voice; -3 = louder), `sfx.whoosh_gap_s`, `sfx.pop: false`; `"sfx": "none"` on a clip; `sfx.enabled: false` for the brand |
+| "no text behind my head", "move the big word" | clip `"hook_kind": "two-tier"`; `hook_title.depth.overlap` (more/less hidden), `depth.max_glyph_px` (size) |
 | "change the phone on the end" | `contact` in the brand profile |
 | "different song", "no music", "music lower" | clip `music` in the plan, or `music.volume_db` (-26 is quieter) |
 | "cut that line", "keep the part about…" | the clip's `segments` |
@@ -186,6 +211,9 @@ same revision twice.
   as a B-roll file. The built-in end card is a still that flashes in, not an animation.
 - **Not built yet** (the editor does these, the scripts don't): whip and zoom-blur transitions
   between angles, light-leak flashes mid-clip, multi-camera angle switching. Single-camera footage
-  gets punch-ins instead (with `edit.rhythm`, every few seconds as well as on cuts).
+  gets punch-ins instead (with `edit.rhythm`, every few seconds as well as on cuts). Also not built: a
+  "spotlight" moment (background dims and blurs on the punchline, reusing the cut-out) and icon pop-ins.
+- **Sound effects can't be judged from numbers alone.** QA checks their levels against the voice, but
+  ask the user to listen to the first clip with effects before shipping a batch.
 - **iPhone HDR footage** (10-bit, e.g. 1440×2560 60 fps) is converted to 8-bit without tone mapping.
   If colours look washed out, re-export the source as SDR first.

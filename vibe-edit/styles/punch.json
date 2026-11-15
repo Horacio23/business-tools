@@ -1,0 +1,41 @@
+{
+  "name": "punch",
+  "description": "Punch: Cyber Popular's house edit (named by Horacio on 2026-11-14; it was called 'accent' before, and that name still loads this file), built for fast talking-head reels and ads: captions appear word by word, 3 at a time, in white heavy sans with a navy edge; numbers and the words the speaker leans on jump out on their own line, bigger, in cyan with an electric-blue glow (the design system's 'glow behind key numbers' accent); a 'depth' hook: a giant cyan word rising from BEHIND the speaker's head (person cut-out), a small line above it and a white label across it (falls back to the two-tier hook when the word is too long, the head is too high, or the cut-out model isn't on the computer); a zoom cut every ~3 s or at each new sentence; sound effects (whoosh on zoom cuts, soft pop on key words, riser + hit on the hook); every caption and the hook stay inside Meta's ad safe zone (so any video can run as an ad), which puts captions above the head on tight close-ups; no end card, the video ends when the speaker does. Colours are the Cyber Popular Design System's; a client profile overrides color / emphasis.color / glow. Write hook_title as 'top line | BIG | label' (e.g. 'Tienes | 300 | segundos'): BIG is ONE short word or number that still reads with its lower third hidden.",
+  "caption": {
+    "mode": "reveal",
+    "font_file": ["C:/Windows/Fonts/ariblk.ttf", "/System/Library/Fonts/Supplemental/Arial Black.ttf"],
+    "size": 84, "uppercase": false, "words_per_chunk": 3, "max_line_px": 820,
+    "color": "#FFFFFF", "outline": "#0A1B3D", "outline_px": 5, "outline_opacity": 1.0, "blur": 0,
+    "shadow_px": 3, "shadow_color": "#0A1B3D", "shadow_opacity": 0.55,
+    "y": "auto", "y_pref": 1080, "strip_punctuation": "light", "fade_ms": 70, "numbers_as_digits": true,
+    "safe_zone": {"top": 269, "bottom": 1248, "side": 65},
+    "emphasis": {
+      "enabled": true,
+      "font_file": ["C:/Windows/Fonts/ariblk.ttf", "/System/Library/Fonts/Supplemental/Arial Black.ttf"],
+      "size": 150, "color": "#00D4FF", "uppercase": true, "line_scale": 0.85,
+      "numbers": true, "pick": "stress", "stress_min": 1.2, "every_s": 2.2, "max_gap_s": 4.0, "min_len": 4,
+      "pop": 1.25, "glow": "#2563FF", "glow_px": 16, "glow_blur": 12, "glow_opacity": 0.8
+    }
+  },
+  "hook_title": {
+    "enabled": true, "kind": "depth", "seconds": 2.6, "uppercase": true,
+    "small_font_file": ["C:/Windows/Fonts/ariblk.ttf", "/System/Library/Fonts/Supplemental/Arial Black.ttf"],
+    "small_size": 80, "small_color": "#FFFFFF", "small_y": 330,
+    "font_file": ["C:/Windows/Fonts/ariblk.ttf", "/System/Library/Fonts/Supplemental/Arial Black.ttf"],
+    "size": 230, "big_color": "#00D4FF", "big_y": 480, "big_max_px": 900, "glow": "#2563FF",
+    "depth": {"top_size": 110, "label_size": 150, "label_color": "#FFFFFF", "max_glyph_px": 400,
+              "min_glyph_px": 180, "overlap": 0.3, "gap_px": 28, "label_at": 0.55, "label_delay": 0.35,
+              "rise_px": 140, "rise_ms": 420}
+  },
+  "sfx": {"enabled": true, "whoosh": true, "whoosh_db": -8, "whoosh_gap_s": 3.0, "pop": true, "pop_db": -12,
+          "pop_gap_s": 1.2, "hit": true, "hit_db": -3, "riser": true, "riser_db": -10},
+  "end_card": {"enabled": false},
+  "grade": {"enabled": false},
+  "music": {"volume_db": -22, "duck": true},
+  "edit": {
+    "punch_in": 1.12, "min_piece_for_punch": 0.8,
+    "rhythm": {"enabled": true, "every_s": 3.0, "min_shot_s": 1.3, "at_sentence": true,
+               "zooms": [1.0, 1.12, 1.0, 1.24], "max_face_area": 0.155}
+  },
+  "qa": {"min_voice_over_music_db": 10}
+}

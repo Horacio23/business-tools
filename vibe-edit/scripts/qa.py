@@ -110,7 +110,12 @@ def main() -> None:
                                                " (long tail)" if tail > 0.9 else "")
          + (f", then a {card:.1f}s end card" if card else ""))
     sr = 16000
-    x = load_audio(final, sr)
+    # with sound effects, the cut and music checks run on the voice + music mix from before the effects
+    # (a whoosh on a cut is not a pop); the effects get their own check below
+    sfx = m.get("sfx") or []
+    base_mix = work / (m.get("mix_base") or "")
+    pre = bool(sfx) and base_mix.is_file()
+    x = load_audio(base_mix if pre else final, sr)
     pops = []
     for s in m["seams"]:
         c = int(s * sr)
@@ -119,7 +124,8 @@ def main() -> None:
         if local > 0.08 and local > ref * 1.6:
             pops.append(f"{s:.2f}s")
     gate("2 AUDIO cuts", "FAIL" if pops else "PASS",
-         f"spike at cut {', '.join(pops)}" if pops else f"{len(m['seams'])} cuts, no pops")
+         (f"spike at cut {', '.join(pops)}" if pops else f"{len(m['seams'])} cuts, no pops")
+         + (" (checked before the sound effects)" if pre else ""))
     if m.get("music"):
         spans = [(w["start"], w["end"]) for w in m["words"]]
         speech = np.concatenate([x[int(s * sr):int(e * sr)] for s, e in spans]) if spans else np.array([])
@@ -134,6 +140,28 @@ def main() -> None:
                  f"voice sits {sep:.1f} dB over the music in pauses (want >= {music_sep} for this style)")
         else:
             gate("2 AUDIO music bed", "NOTE", "no pause long enough to measure; listen to it")
+    if sfx and pre and (work / "sfx.wav").is_file():
+        # how loud each effect is at its loudest 30 ms, against the voice's average level (both before loudnorm)
+        fx = load_audio(work / "sfx.wav", sr)
+        spans = [(w["start"], w["end"]) for w in m["words"]]
+        voice = rms_db(np.concatenate([x[int(s * sr):int(e * sr)] for s, e in spans]))
+        win = int(0.03 * sr)
+        rel = []
+        for ev in sfx:
+            seg = fx[int(ev["start"] * sr):int(ev["end"] * sr) + 1]
+            if len(seg) > win:
+                c = np.cumsum(np.concatenate([[0.0], seg.astype(np.float64) ** 2]))
+                rel.append(10 * np.log10((c[win:] - c[:-win]).max() / win + 1e-12) - voice)
+        kinds = {}
+        for ev in sfx:
+            kinds[ev["kind"]] = kinds.get(ev["kind"], 0) + 1
+        loudest = max(rel) if rel else -99
+        busy = len(sfx) / max(m.get("content_end", dur), 1)
+        st = "FAIL" if loudest > 3 else "WARN" if loudest > 0 or busy > 0.8 else "PASS"
+        gate("2 AUDIO sound effects", st,
+             f"{len(sfx)} effects ({', '.join(f'{n} {k}' for k, n in kinds.items())}), loudest "
+             f"{loudest:+.1f} dB vs the voice's average level (want <= 0)"
+             + (f"; busy: {busy:.1f} per second" if busy > 0.8 else "") + "; listen to one before shipping")
 
     # 3 VISUAL -------------------------------------------------------------
     bd = ffmpeg_stderr(["-i", str(final), "-vf", "blackdetect=d=0.07:pix_th=0.10", "-an", "-f", "null", "-"])
@@ -163,7 +191,8 @@ def main() -> None:
                 worst = "WARN" if worst == "PASS" else worst
     gate("3 VISUAL framing", worst, "; ".join(face_notes) or "face found and framed in every segment")
     # contact sheet: open, each cut, close
-    times = [0.3] + [s + 0.15 for s in sorted(m["seams"] + m.get("zoom_cuts", []))][:16] + [max(dur - 0.3, 0)]
+    times = [0.3] + ([1.0] if m.get("hook_seconds") and m["hook_seconds"] > 1.3 else []) \
+        + [s + 0.15 for s in sorted(m["seams"] + m.get("zoom_cuts", []))][:16] + [max(dur - 0.3, 0)]
     tiles = []
     for t in times:
         raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", str(final), "-frames:v", "1",
@@ -226,7 +255,9 @@ def main() -> None:
     if out_band:
         notes.append(f"caption line(s) at y={out_band[:4]} leave {zname}")
         st = "FAIL"
-    out_hook = [b["text"] for b in m.get("hook_boxes") or [] if not inside(b) or b["width_px"] > 1080 - 2 * zone["side"]]
+    # depth hooks record their exact ink edges (top/bottom); other hooks use the size estimate
+    in_hook = lambda b: zone["top"] <= b["top"] and b["bottom"] <= zone["bottom"] if "top" in b else inside(b)  # noqa: E731
+    out_hook = [b["text"] for b in m.get("hook_boxes") or [] if not in_hook(b) or b["width_px"] > 1080 - 2 * zone["side"]]
     if out_hook:
         notes.append(f"hook line(s) {out_hook} leave {zname}")
         st = "FAIL"
@@ -234,7 +265,9 @@ def main() -> None:
     if flick:
         notes.append(f"{len(flick)} caption(s) on screen < 0.15s")
         st = "WARN" if st == "PASS" else st
-    max_hook = 3 if m.get("hook_kind") == "two-tier" else 2
+    max_hook = 3 if m.get("hook_kind") in ("two-tier", "depth") else 2
+    if m.get("hook_note"):
+        notes.append(m["hook_note"])
     if m.get("hook_lines") and len(m["hook_lines"]) > max_hook:
         notes.append(f"hook title wraps to {len(m['hook_lines'])} lines (keep it to {max_hook})")
         st = "WARN" if st == "PASS" else st

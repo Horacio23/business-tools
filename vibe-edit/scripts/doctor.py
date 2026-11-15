@@ -7,7 +7,8 @@
   uv run doctor.py [--brand <video-style.json>]
 
 Checks: ffmpeg + ffprobe on PATH with libass (needed for captions); the ElevenLabs key
-(optional: without it, transcription runs locally for free); the agency brand profile (found in
+(optional: without it, transcription runs locally for free); npx + the person cut-out model (optional:
+the text-behind-the-head hook); the agency brand profile (found in
 the vault's machine/vibe-edit/ on the PC or the Mac, or passed with --brand), its fonts and music.
 Prints what to do for anything missing. Exit code 0 = ready.
 """
@@ -58,6 +59,16 @@ def main() -> None:
     line(bool(key and key.startswith("sk_")), f"ElevenLabs key in {KEY_FILE} (optional)",
          f"create the file with one line ELEVENLABS_API_KEY=sk_... (ElevenLabs > Developers > API Keys); "
          f"without it transcription runs locally with faster-whisper (free, fewer cuts)")
+
+    # the "depth" hook (big text behind the speaker's head) cuts the person out with HyperFrames
+    model = HOME / ".cache" / "hyperframes" / "background-removal" / "models" / "u2net_human_seg.onnx"
+    npx = shutil.which("npx")
+    line(bool(npx), "npx on PATH (HyperFrames, for the text-behind-the-head hook; optional)",
+         "install Node.js LTS (brew install node / winget install OpenJS.NodeJS.LTS)")
+    line(model.exists(), f"person cut-out model {model} (optional)",
+         "one-time 176 MB download of the MIT u2net_human_seg model from the rembg GitHub releases; ask the "
+         "user first, then run: npx hyperframes remove-background <any photo of a person>.jpg -o test.png. "
+         "Without it, 'depth' hooks fall back to the two-tier hook")
 
     brand = a.brand
     if not brand:

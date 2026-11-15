@@ -21,6 +21,8 @@ plan.json:
      "style": "serenity-bold",   # optional per clip (render the same cut in two looks)
      "emphasis": [12, 27],       # reveal styles: source word ids set big (+ numbers if the style says so);
                                  # "auto" (default: numbers + the style's pick rule) | "none"
+     "hook_kind": "depth",       # optional: override the style's hook ("depth" | "two-tier" | "box")
+     "sfx": "none",              # optional: no sound effects on this clip (styles with sfx.enabled)
      "broll": [{"file": "C:/.../laser.mp4", "at_word": 14, "seconds": 2.0, "from": 0.0}]}
   ]
 }
@@ -36,8 +38,12 @@ Per clip, in this order (order is load-bearing):
   2. per piece: face-centred 9:16 crop (+ alternating punch-in; with edit.rhythm also zoom cuts inside a
      take at sentence ends / every few seconds, video only), style grade, 30ms audio fades
   3. end card piece (style layout + brand logo/contact lines), lossless concat -> base.mov
-  4. voice clean-up + music bed ducked under the voice -> two-pass loudnorm
-  5. B-roll cutaways, logo overlay, then captions + hook burned LAST
+  4. voice clean-up + music bed ducked under the voice -> mix_base.wav
+  5. a "depth" hook cuts the speaker out of the hook seconds (HyperFrames remove-background) and draws its
+     big word BEHIND the head: base -> behind.ass -> cut-out on top -> everything else
+  6. sound effects (sfx.py, synthesized: whoosh on zoom cuts, pop on key words, riser + hit on the hook)
+     mixed in at levels relative to the voice -> mix.wav -> two-pass loudnorm
+  7. B-roll cutaways, logo overlay, then captions + hook burned LAST
 Outputs: <deliver>/<slug>.mp4, <slug>.srt, <slug>-cover.jpg; <work>/<slug>/build.json
 (seams, pieces, face boxes, caption lines, effective QA targets) which qa.py reads.
 """
@@ -61,9 +67,11 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 sys.path.insert(0, str(Path(__file__).parent))
 from common import (ass_color, digits_for, display_size, fmt_ass_time, fmt_srt_time, load_words, resolve_font,  # noqa: E402
                     probe, run, video_stream)
+import sfx as sfxlib  # noqa: E402
 
 OUT_W, OUT_H, FPS = 1080, 1920, 30
 STYLES_DIR = Path(__file__).resolve().parent.parent / "styles"
+STYLE_ALIASES = {"accent": "punch"}  # old style names, so older plans and profiles still build
 DEFAULTS = {
     "language": "es",
     "caption": {"mode": "karaoke", "font_file": "C:/Windows/Fonts/ariblk.ttf", "size": 78, "uppercase": False,
@@ -84,7 +92,15 @@ DEFAULTS = {
     "hook_title": {"enabled": True, "kind": "box", "font_file": None, "size": 62, "color": "#FFFFFF",
                    "box": "#000000", "y": 430, "seconds": 3.0, "uppercase": False, "max_line_px": 860,
                    "small_font_file": None, "small_size": 62, "small_color": "#FFFFFF", "small_y": 340,
-                   "big_color": "#F4CE3C", "big_y": 470, "big_max_px": 900, "glow": None},
+                   "big_color": "#F4CE3C", "big_y": 470, "big_max_px": 900, "glow": None,
+                   # kind "depth": hook_title "top line | BIG | label". BIG is sized to the frame width (capped
+                   # at max_glyph_px tall) and drawn BEHIND the speaker so the head hides `overlap` of its
+                   # height; it rises rise_px from behind the head. The label sits in front across its middle,
+                   # never on the head. Falls back to two-tier if BIG would be under min_glyph_px tall, the
+                   # head is too high for it, or the cut-out tool/model isn't on this computer.
+                   "depth": {"top_size": 110, "label_size": 150, "label_color": "#FFFFFF", "max_glyph_px": 400,
+                             "min_glyph_px": 180, "overlap": 0.3, "gap_px": 28, "label_at": 0.55,
+                             "label_delay": 0.35, "rise_px": 140, "rise_ms": 420}},
     "end_card": {"enabled": False, "seconds": 2.0, "background": "#FFFFFF", "logo_width": 600, "logo_y": 900,
                  "lines_y": 1400, "line_gap": 125, "text_font": None, "text_size": 70, "small_size": 34,
                  "text_color": "#FFFFFF", "label_color": "#C9A54E", "icon_height": 96, "shadow": True,
@@ -104,9 +120,15 @@ DEFAULTS = {
              # never fills more than max_face_area of the frame
              "rhythm": {"enabled": False, "every_s": 3.0, "min_shot_s": 1.3, "at_sentence": True,
                         "zooms": [1.0, 1.12, 1.0, 1.24], "max_face_area": 0.17}},
+    # sound effects (sfx.py): a whoosh on zoom cuts (sentence ends first, at most one per whoosh_gap_s), a pop
+    # when a key word lands (not within 0.45 s of a whoosh), a hit when the hook lands (+ a riser while a
+    # depth hook rises). *_db = loudest 30 ms of the effect vs the voice's average level.
+    "sfx": {"enabled": False, "whoosh": True, "whoosh_db": -8, "whoosh_gap_s": 3.0, "pop": True, "pop_db": -12,
+            "pop_gap_s": 1.2, "hit": True, "hit_db": -3, "riser": True, "riser_db": -10},
     "qa": {"min_voice_over_music_db": 10},
     "compliance": {"profile": "none", "extra_terms": []},
 }
+CUTOUT_MODEL = Path.home() / ".cache" / "hyperframes" / "background-removal" / "models" / "u2net_human_seg.onnx"
 # Profile keys that are identity (apply whatever style is chosen); everything else is look.
 IDENTITY = {"language", "logo", "contact", "audio", "length", "compliance"}
 MUSIC_IDENTITY = {"enabled", "folder", "track"}
@@ -135,7 +157,9 @@ def load_brand(path: Path, style: str | None = None) -> dict:
     raw = json.loads(path.read_text(encoding="utf-8"))
     root = path.parent
     own = raw.get("style") or "karaoke"
+    own = STYLE_ALIASES.get(own, own)
     name = style or own
+    name = STYLE_ALIASES.get(name, name)
     st = load_style(name, root)
     b = merge(DEFAULTS, {k: v for k, v in st.items() if k not in ("name", "description")})
     if name == own:  # the profile's own look settings tune its default style
@@ -145,7 +169,10 @@ def load_brand(path: Path, style: str | None = None) -> dict:
         if isinstance(raw.get("music"), dict):
             ident["music"] = {k: v for k, v in raw["music"].items() if k in MUSIC_IDENTITY}
         b = merge(b, ident)
-    b = merge(b, (raw.get("styles") or {}).get(name, {}))
+    per_style = raw.get("styles") or {}
+    for old in [k for k, v in STYLE_ALIASES.items() if v == name]:
+        b = merge(b, per_style.get(old, {}))
+    b = merge(b, per_style.get(name, {}))
     b["style"] = name
     rel = lambda v: str((root / v).resolve()) if v and not Path(v).is_absolute() else v  # noqa: E731
     for sect, key in [("logo", "path"), ("music", "folder"), ("music", "track"), ("contact", "logo")]:
@@ -608,6 +635,127 @@ def wrap_title(text: str, font: ImageFont.FreeTypeFont, max_px: int) -> list[str
     return lines + ([cur] if cur else [])
 
 
+# ------------------------------------------------------------------- hook ----
+def ink_box(path, size: float, text: str, y: float = 0) -> tuple[int, int, int]:
+    """(top, bottom, width) of `text` as libass draws it at \\pos(540, y), alignment 5. The line box is the
+    font's full height (= the ASS size) centred on y, with the baseline winAscent below its top. Matches
+    libass to the pixel vertically; the width is the advance (a few % wider than the ink, so fits are safe)."""
+    from fontTools.ttLib import TTFont
+    os2 = TTFont(str(path), fontNumber=0, lazy=True)["OS/2"]
+    base = y - size / 2 + size * os2.usWinAscent / (os2.usWinAscent + os2.usWinDescent)
+    f = ass_pil_font(path, size)
+    _, t, _, b = f.getbbox(text, anchor="ls")
+    return round(base + t), round(base + b), round(f.getlength(text))
+
+
+def hook_parts(title: str, upper: bool) -> list[str]:
+    parts = [p.strip() for p in title.split("|")]
+    return [p.upper() if upper else p for p in parts]
+
+
+def two_tier_hook(small: str, big: str, hk: dict, hf: Path) -> dict:
+    size = hk["size"]
+    bfont = ass_pil_font(hf, size)
+    widest = max(bfont.getlength(w) for w in big.split())
+    if widest > hk["big_max_px"]:
+        size = int(size * hk["big_max_px"] / widest)
+        bfont = ass_pil_font(hf, size)
+    hook = {"kind": "two-tier", "small": small, "big": wrap_title(big, bfont, hk["big_max_px"]), "big_size": size}
+    hook["lines"] = ([small] if small else []) + hook["big"]
+    sfont = ass_pil_font(hk["small_font_file"], hk["small_size"])
+    hook["boxes"] = ([{"text": small, "y": hk["small_y"], "size": hk["small_size"],
+                       "width_px": round(sfont.getlength(small))}] if small else []) + \
+        [{"text": ln, "y": hk["big_y"] + n * round(size * 0.95), "size": size,
+          "width_px": round(bfont.getlength(ln))} for n, ln in enumerate(hook["big"])]
+    hook["land"] = 0.1
+    return hook
+
+
+def cutout_person(work: Path, seconds: float) -> tuple[Path | None, str]:
+    """Cut the speaker out of the first `seconds` of base.mov with HyperFrames' remove-background
+    (u2net_human_seg, MIT; ~3.5 frames/s on a CPU). Returns (ProRes 4444 .mov with alpha, "") or (None, why).
+    Never downloads the model itself: that's a one-time 176 MB download the user OKs (doctor.py says how)."""
+    npx = shutil.which("npx")
+    if not npx:
+        return None, "npx (Node.js) is not installed"
+    if not CUTOUT_MODEL.exists():
+        return None, f"the cut-out model isn't downloaded yet ({CUTOUT_MODEL.name}, 176 MB; see doctor.py)"
+    run(["ffmpeg", "-v", "error", "-y", "-i", "base.mov", "-t", f"{seconds:.3f}", "-an", "-c:v", "libx264",
+         "-crf", "10", "-pix_fmt", "yuv420p", "hook-src.mp4"], cwd=work)
+    r = subprocess.run([npx, "--yes", "hyperframes", "remove-background", "hook-src.mp4", "-o", "cutout.mov"],
+                       cwd=work, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode != 0 or not (work / "cutout.mov").exists():
+        return None, f"remove-background failed: {(r.stderr or r.stdout)[-300:]}"
+    return work / "cutout.mov", ""
+
+
+def head_tops(cutout: Path) -> list[int]:
+    """Top of the person in each frame of the cut-out (output px), from its alpha. A row counts once it is
+    ~24 px wide, so stray specks above the hair are ignored."""
+    w, h = 270, 480
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(cutout), "-vf", f"alphaextract,scale={w}:{h}",
+                          "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True).stdout
+    tops = []
+    for fr in np.frombuffer(raw, np.uint8)[: len(raw) // (w * h) * w * h].reshape(-1, h, w):
+        rows = np.where((fr > 128).sum(1) >= 6)[0]
+        if len(rows):
+            tops.append(int(rows[0] * OUT_H / h))
+    return tops
+
+
+def layout_depth(top: str, big: str, label: str, hk: dict, head_top: int, zone: dict) -> dict | None:
+    """Place the depth hook around the measured head top: BIG's bottom `overlap` of its height below the head
+    top, the top line above it, the label across BIG's middle (but never on the head). None = doesn't fit."""
+    d = hk["depth"]
+    max_w = OUT_W - 2 * max(zone.get("side") or 0, 40) - 10
+    bf, sf = hk["font_file"], hk["small_font_file"]
+    t, b, w = ink_box(bf, 1000, big)
+    size = 1000 * min(max_w / w, d["max_glyph_px"] / (b - t))
+    t, b, w = ink_box(bf, size, big)
+    gh = b - t
+    ts = d["top_size"]
+    if top:
+        tt, tb, tw = ink_box(sf, ts, top)
+        ts = ts * min(1.0, max_w / tw)
+        tt, tb, tw = ink_box(sf, ts, top)
+    top_block = (tb - tt + d["gap_px"]) if top else 0
+    # BIG may not rise above the zone with the top line on it; if needed, shrink BIG to fit
+    room = head_top + d["overlap"] * gh - gh - top_block - zone["top"]
+    if room < 0:
+        gh_fit = (head_top - top_block - zone["top"]) / (1 - d["overlap"])
+        if gh_fit < d["min_glyph_px"]:
+            return None
+        size *= gh_fit / gh
+        t, b, w = ink_box(bf, size, big)
+        gh = b - t
+    if gh < d["min_glyph_px"]:
+        return None
+    bottom = round(head_top + d["overlap"] * gh)
+    if bottom > zone["bottom"]:
+        return None
+    big_y = bottom - b
+    big_top = bottom - gh
+    out = {"head_top": head_top, "overlap_px": bottom - head_top,
+           "big": {"text": big, "size": round(size), "y": big_y, "y_from": big_y + d["rise_px"],
+                   "ink": [big_top, bottom], "width_px": w}}
+    if top:
+        ty = big_top - d["gap_px"] - tb
+        out["top"] = {"text": top, "size": round(ts), "y": ty, "ink": [ty + tt, ty + tb], "width_px": tw}
+    else:
+        out["top"] = None
+    if label:
+        ls = d["label_size"]
+        lt, lb, lw = ink_box(sf, ls, label)
+        ls *= min(1.0, 0.9 * w / lw)
+        lt, lb, lw = ink_box(sf, ls, label)
+        centre = min(big_top + d["label_at"] * gh, head_top - 8 - (lb - lt) / 2)
+        ly = round(centre - (lt + lb) / 2)
+        out["label"] = {"text": label, "size": round(ls), "y": ly, "ink": [ly + lt, ly + lb], "width_px": lw}
+    else:
+        out["label"] = None
+    return out
+
+
 def opacity_alpha(opacity: float) -> int:
     return max(0, min(255, round((1 - opacity) * 255)))
 
@@ -678,7 +826,21 @@ def write_ass(path: Path, chunks: list[dict], brand: dict, faces: dict, hook: di
                     else:
                         parts.append(t)
                 ev.append(f"Dialogue: 0,{fmt_ass_time(s)},{fmt_ass_time(e)},Cap,,0,0,0,,{{{pos}}}{' '.join(parts)}")
-    if hook and hk["kind"] == "two-tier":
+    kind = hook.get("kind", hk["kind"]) if hook else None
+    if hook and kind == "depth":  # front layer only: the top line + the label (BIG is in behind.ass)
+        d = hook["depth"]
+        if d["top"]:
+            soft = dict(cap, outline_px=2, shadow_px=2)
+            styles.append(ass_style("HookS", faces["hook_small"], d["top"]["size"], hk["small_color"], soft))
+            ev.append(f"Dialogue: 3,{fmt_ass_time(0)},{fmt_ass_time(hk['seconds'])},HookS,,0,0,0,,"
+                      f"{{\\pos(540,{d['top']['y']})\\blur4\\fad(150,250)}}{ass_escape(d['top']['text'])}")
+        if d["label"]:
+            styles.append(ass_style("HookL", faces["hook_small"], d["label"]["size"], hk["depth"]["label_color"],
+                                    dict(cap, outline_px=6, shadow_px=4)))
+            ev.append(f"Dialogue: 3,{fmt_ass_time(hk['depth']['label_delay'])},{fmt_ass_time(hk['seconds'])},"
+                      f"HookL,,0,0,0,,{{\\pos(540,{d['label']['y']})\\blur2\\fscx130\\fscy130"
+                      f"\\t(0,160,\\fscx100\\fscy100)\\fad(80,250)}}{ass_escape(d['label']['text'])}")
+    elif hook and kind == "two-tier":
         soft = dict(cap, outline_px=2, shadow_px=2)
         styles.append(ass_style("HookS", faces["hook_small"], hk["small_size"], hk["small_color"], soft))
         styles.append(ass_style("HookB", faces["hook"], hook["big_size"], hk["big_color"], soft))
@@ -704,6 +866,10 @@ def write_ass(path: Path, chunks: list[dict], brand: dict, faces: dict, hook: di
         txt = "\\N".join(ass_escape(l) for l in hook["lines"])
         ev.append(f"Dialogue: 3,{fmt_ass_time(0)},{fmt_ass_time(hk['seconds'])},Hook,,0,0,0,,"
                   f"{{\\pos(540,{hk['y']})\\fad(0,250)}}{txt}")
+    write_ass_doc(path, styles, ev)
+
+
+def write_ass_doc(path: Path, styles: list[str], ev: list[str]) -> None:
     path.write_text(
         "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n"
         "ScaledBorderAndShadow: yes\n\n[V4+ Styles]\n"
@@ -712,6 +878,27 @@ def write_ass(path: Path, chunks: list[dict], brand: dict, faces: dict, hook: di
         "Alignment, MarginL, MarginR, MarginV, Encoding\n" + "\n".join(styles) +
         "\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n" +
         "\n".join(ev) + "\n", encoding="utf-8")
+
+
+def write_depth_behind(path: Path, hook: dict, brand: dict, faces: dict) -> None:
+    """The depth hook's BIG word (and its glow), rising from behind the head. Burned BEFORE the cut-out of
+    the speaker is laid on top, so the head covers it."""
+    cap, hk = brand["caption"], brand["hook_title"]
+    d, bg = hook["depth"], hook["depth"]["big"]
+    styles = [ass_style("HookB", faces["hook"], bg["size"], hk["big_color"], dict(cap, outline_px=3, shadow_px=0))]
+    t = f"{fmt_ass_time(0.05)},{fmt_ass_time(hk['seconds'])}"
+    mv = f"\\move(540,{bg['y_from']},540,{bg['y']},0,{hk['depth']['rise_ms']})"
+    ev = []
+    if hk.get("glow"):
+        em = cap["emphasis"]
+        bord = max(em["glow_px"] + 4, round(bg["size"] * 0.042))
+        styles.append(ass_style("HookG", faces["hook"], bg["size"], hk["glow"], cap, outline_px=bord, shadow_px=0,
+                                box=hk["glow"]))
+        ga = f"&H{opacity_alpha(em['glow_opacity']):02X}&"
+        ev.append(f"Dialogue: 0,{t},HookG,,0,0,0,,{{{mv}\\blur{round(bord * 0.85)}\\1a&HFF&\\3a{ga}"
+                  f"\\fad(150,250)}}{ass_escape(bg['text'])}")
+    ev.append(f"Dialogue: 1,{t},HookB,,0,0,0,,{{{mv}\\blur4\\fad(150,250)}}{ass_escape(bg['text'])}")
+    write_ass_doc(path, styles, ev)
 
 
 # --------------------------------------------------------------- end card ----
@@ -813,6 +1000,48 @@ def loudnorm_stats(wav: Path, lufs: float, tp: float) -> dict:
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     m = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", r.stderr, re.S)
     return json.loads(m.group(0))
+
+
+def plan_sfx(sx: dict, shots: list[dict], out_words: list[dict], chunks: list[dict], hook: dict | None,
+             hook_s: float, content_end: float, broll: list[dict]) -> list[dict]:
+    """Where the sound effects go ("at" = the moment each one peaks or lands)."""
+    ev = []
+    if hook and sx["hit"]:
+        land = hook.get("land", 0.1)
+        if hook.get("kind") == "depth" and sx["riser"]:
+            ev.append({"kind": "riser", "at": land, "db": sx["riser_db"], "why": "hook rises"})
+        ev.append({"kind": "hit", "at": land, "db": sx["hit_db"], "why": "hook lands"})
+    calm = hook_s + 0.3 if hook else 0.3  # the hook has its own sounds
+    ends = [(w["end"], w["text"]) for w in out_words]
+
+    def after_sentence(t: float) -> bool:
+        prev = [txt for e, txt in ends if e <= t + 0.05]
+        return bool(prev) and prev[-1].rstrip()[-1:] in ".?!…"
+
+    cands = [(b["out_start"], after_sentence(b["out_start"])) for a, b in zip(shots, shots[1:])
+             if b["zoom"] != a["zoom"]]
+    cands += [(br["start"], True) for br in broll]  # a B-roll cutaway is a cut too
+    cands = [c for c in cands if calm <= c[0] <= content_end - 0.4]
+    whooshes = []
+    if sx["whoosh"]:
+        for t, _ in sorted(cands, key=lambda c: (not c[1], c[0])):  # sentence ends first, then the rest
+            if all(abs(t - u) >= sx["whoosh_gap_s"] for u in whooshes):
+                whooshes.append(t)
+        for n, t in enumerate(sorted(whooshes)):  # peak 1 frame before the cut: the sound leads the picture
+            ev.append({"kind": "whoosh", "at": round(t - 1 / FPS, 3), "db": sx["whoosh_db"], "variant": n % 3,
+                       "why": f"cut at {t:.2f}s"})
+    if sx["pop"]:
+        last = -9.0
+        for c in chunks:
+            for ln in c.get("lines", []):
+                if ln["kind"] != "emph":
+                    continue
+                t = max(min(w["start"] for w in ln["words"]), c["start"])
+                if t < calm or t - last < sx["pop_gap_s"] or any(abs(t - u) < 0.45 for u in whooshes):
+                    continue
+                ev.append({"kind": "pop", "at": round(t, 3), "db": sx["pop_db"], "why": ln["text"]})
+                last = t
+    return sorted(ev, key=lambda e: e["at"])
 
 
 # ------------------------------------------------------------------- main ----
@@ -951,7 +1180,7 @@ def build(plan: dict, clip: dict, brand: dict, words: list[dict]) -> None:
          "base.mov"], cwd=work)
     total = float(probe(work / "base.mov")["format"]["duration"])
 
-    # ---- audio: voice chain + ducked music bed -> wav, then 2-pass loudnorm
+    # ---- audio: voice chain + ducked music bed -> mix_base.wav (sound effects + loudnorm come after captions)
     au = brand["audio"]
     music = pick_music(clip, brand, slug)
     voice = "highpass=f=80,acompressor=threshold=-20dB:ratio=3:attack=5:release=150:makeup=2" \
@@ -967,14 +1196,10 @@ def build(plan: dict, clip: dict, brand: dict, words: list[dict]) -> None:
         else:
             fg = f"[0:a]{voice}[v];{bed};[v][bed]amix=inputs=2:normalize=0:duration=first[a]"
         run(["ffmpeg", "-v", "error", "-y", "-i", "base.mov", "-stream_loop", "-1", "-i", str(music),
-             "-filter_complex", fg, "-map", "[a]", "-c:a", "pcm_s16le", "mix.wav"], cwd=work)
+             "-filter_complex", fg, "-map", "[a]", "-c:a", "pcm_s16le", "-ar", "48000", "mix_base.wav"], cwd=work)
     else:
-        run(["ffmpeg", "-v", "error", "-y", "-i", "base.mov", "-af", voice, "-c:a", "pcm_s16le", "mix.wav"],
-            cwd=work)
-    ln = loudnorm_stats(work / "mix.wav", au["lufs"], au["true_peak"])
-    loud = (f"loudnorm=I={au['lufs']}:TP={au['true_peak']}:LRA=11:measured_I={ln['input_i']}:"
-            f"measured_TP={ln['input_tp']}:measured_LRA={ln['input_lra']}:measured_thresh={ln['input_thresh']}:"
-            f"offset={ln['target_offset']}:linear=true,aresample=48000")
+        run(["ffmpeg", "-v", "error", "-y", "-i", "base.mov", "-af", voice, "-c:a", "pcm_s16le", "-ar", "48000",
+             "mix_base.wav"], cwd=work)
 
     # ---- captions + hook title
     cap = dict(brand["caption"])
@@ -1022,31 +1247,44 @@ def build(plan: dict, clip: dict, brand: dict, words: list[dict]) -> None:
         chunks = build_captions(out_words, cap, cap_font, brand["language"])
     hook = None
     hk = brand["hook_title"]
+    hook_note = None
     if clip.get("hook_title") and hk["enabled"]:
         hf = use_font("hook", hk["font_file"])
-        if hk["kind"] == "two-tier":  # "small part | BIG WORD"; no "|" = all big
+        kind = clip.get("hook_kind") or hk["kind"]
+        if kind == "depth":  # "top line | BIG | label"; "top | BIG label" and "BIG label" work too
             use_font("hook_small", hk["small_font_file"])
-            small, _, big = clip["hook_title"].rpartition("|")
-            small, big = small.strip(), big.strip()
-            if hk["uppercase"]:
-                small, big = small.upper(), big.upper()
-            size = hk["size"]
-            bfont = ass_pil_font(hf, size)
-            widest = max(bfont.getlength(w) for w in big.split())
-            if widest > hk["big_max_px"]:
-                size = int(size * hk["big_max_px"] / widest)
-                bfont = ass_pil_font(hf, size)
-            hook = {"small": small, "big": wrap_title(big, bfont, hk["big_max_px"]), "big_size": size}
-            hook["lines"] = ([small] if small else []) + hook["big"]
-            sfont = ass_pil_font(hk["small_font_file"], hk["small_size"])
-            hook["boxes"] = ([{"text": small, "y": hk["small_y"], "size": hk["small_size"],
-                               "width_px": round(sfont.getlength(small))}] if small else []) + \
-                [{"text": ln, "y": hk["big_y"] + n * round(size * 0.95), "size": size,
-                  "width_px": round(bfont.getlength(ln))} for n, ln in enumerate(hook["big"])]
-        else:
+            parts = hook_parts(clip["hook_title"], hk["uppercase"])
+            if len(parts) >= 3:
+                top, big, label = parts[0], parts[1], " ".join(parts[2:])
+            else:
+                top = parts[0] if len(parts) == 2 else ""
+                big, _, label = parts[-1].partition(" ")
+            cut, why = cutout_person(work, hk["seconds"] + 0.1)
+            tops = head_tops(cut) if cut else []
+            lay = layout_depth(top, big, label.strip(), hk, int(statistics.median(tops)), band) if tops else None
+            if lay:
+                hook = {"kind": "depth", "depth": lay, "land": 0.05 + hk["depth"]["rise_ms"] / 1000,
+                        "lines": [x["text"] for x in (lay["top"], lay["big"], lay["label"]) if x],
+                        "boxes": [{"text": x["text"], "y": x["y"], "size": x["size"], "width_px": x["width_px"],
+                                   "top": x["ink"][0], "bottom": x["ink"][1], **({"behind": True} if x is lay["big"]
+                                                                                 else {})}
+                                  for x in (lay["top"], lay["big"], lay["label"]) if x]}
+                hook_note = (f"depth hook: '{big}' behind the head (head top y={lay['head_top']}, "
+                             f"{lay['overlap_px']}px hidden)")
+            else:
+                why = why or ("no person found in the cut-out" if not tops else
+                              f"'{big}' can't be big enough behind the head (head top y={statistics.median(tops):.0f})")
+                hook_note = f"depth hook fell back to two-tier: {why}"
+                kind = "two-tier"
+        if kind == "two-tier":  # "small part | BIG WORD(S)"; a depth title "a | B | c" reads "a" / "B c"
+            use_font("hook_small", hk["small_font_file"])
+            parts = hook_parts(clip["hook_title"], hk["uppercase"])
+            small, big = (parts[0], " ".join(parts[1:])) if len(parts) > 1 else ("", parts[0])
+            hook = two_tier_hook(small, big, hk, hf)
+        elif kind != "depth":
             hfont = ass_pil_font(hf, hk["size"])
-            title = clip["hook_title"].upper() if hk["uppercase"] else clip["hook_title"]
-            hook = {"lines": wrap_title(title, hfont, hk["max_line_px"] - 36)}
+            title = " ".join(hook_parts(clip["hook_title"], hk["uppercase"]))
+            hook = {"kind": "box", "land": 0.1, "lines": wrap_title(title, hfont, hk["max_line_px"] - 36)}
             n = len(hook["lines"])
             hook["boxes"] = [{"text": ln, "y": round(hk["y"] + (j - (n - 1) / 2) * hk["size"]), "size": hk["size"],
                               "width_px": round(hfont.getlength(ln)) + 36} for j, ln in enumerate(hook["lines"])]
@@ -1061,9 +1299,15 @@ def build(plan: dict, clip: dict, brand: dict, words: list[dict]) -> None:
         chunks = kept
     write_ass(work / "captions.ass", chunks, brand, fonts_used, hook)
 
-    # ---- final: B-roll cutaways, logo overlay, captions LAST, normalized audio
+    # ---- final: depth hook (BIG behind the head), B-roll cutaways, logo overlay, captions LAST, audio
     inputs = ["-i", "base.mov", "-i", "mix.wav"]
     graph, v, n_in = [], "[0:v]", 2
+    if hook and hook.get("kind") == "depth":
+        write_depth_behind(work / "behind.ass", hook, brand, fonts_used)
+        inputs += ["-i", "cutout.mov"]
+        graph.append("[0:v]subtitles=behind.ass:fontsdir=fonts[vd]")
+        graph.append("[vd][2:v]overlay=0:0:format=yuv444:eof_action=pass[vc]")
+        v, n_in = "[vc]", 3
     broll = []
     by_word = {w["i"]: w["start"] for w in out_words}
     for k, b in enumerate(clip.get("broll", [])):
@@ -1090,6 +1334,24 @@ def build(plan: dict, clip: dict, brand: dict, words: list[dict]) -> None:
         v = "[vl]"
     graph.append(f"{v}subtitles=captions.ass:fontsdir=fonts[v]")
     vf = ";".join(graph)
+
+    # ---- sound effects on top of voice + music, then 2-pass loudnorm of the whole mix
+    sx = brand["sfx"]
+    sfx_events = []
+    if sx["enabled"] and clip.get("sfx", "auto") != "none":
+        sfx_events = plan_sfx(sx, shots, out_words, chunks, hook, hk["seconds"], content_end, broll)
+    if sfx_events:
+        vdb = sfxlib.voice_level_db(work / "mix_base.wav", [(w["start"], w["end"]) for w in out_words])
+        sfxlib.write_wav(work / "sfx.wav", sfxlib.render(sfx_events, total, vdb))
+        run(["ffmpeg", "-v", "error", "-y", "-i", "mix_base.wav", "-i", "sfx.wav", "-filter_complex",
+             "[0:a][1:a]amix=inputs=2:normalize=0:duration=first[a]", "-map", "[a]", "-c:a", "pcm_s16le",
+             "mix.wav"], cwd=work)
+    else:
+        shutil.copy(work / "mix_base.wav", work / "mix.wav")
+    ln = loudnorm_stats(work / "mix.wav", au["lufs"], au["true_peak"])
+    loud = (f"loudnorm=I={au['lufs']}:TP={au['true_peak']}:LRA=11:measured_I={ln['input_i']}:"
+            f"measured_TP={ln['input_tp']}:measured_LRA={ln['input_lra']}:measured_thresh={ln['input_thresh']}:"
+            f"offset={ln['target_offset']}:linear=true,aresample=48000")
     final = deliver / f"{slug}.mp4"
     run(["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", f"{vf};[1:a]{loud}[a]",
          "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "medium", "-crf", "18",
@@ -1125,8 +1387,13 @@ def build(plan: dict, clip: dict, brand: dict, words: list[dict]) -> None:
                           for c in chunks for ln in c["lines"]],
         "caption_mode": cap["mode"], "caption_y": cap["y"], "caption_size": cap["size"],
         "max_line_px": cap["max_line_px"],
-        "hook_lines": hook["lines"] if hook else None, "hook_kind": hk["kind"] if hook else None,
+        "hook_lines": hook["lines"] if hook else None,
+        "hook_kind": hook.get("kind", hk["kind"]) if hook else None,
         "hook_boxes": hook.get("boxes") if hook else None, "hook_seconds": hk["seconds"] if hook else None,
+        "hook_depth": ({k: hook["depth"][k] for k in ("head_top", "overlap_px")} | {"cutout": "cutout.mov"})
+        if hook and hook.get("kind") == "depth" else None,
+        "hook_note": hook_note,
+        "sfx": sfx_events, "mix_base": "mix_base.wav" if sfx_events else None,
         "safe_zone": cap.get("safe_zone"), "caption_place": place, "zoom_anchor": anchor,
         "style": brand["style"], "grade": dict(grade_info, filter=grade) if grade else None,
         "content_end": round(content_end, 3), "end_card_seconds": round(card_s, 3), "broll": broll,
@@ -1141,7 +1408,8 @@ def build(plan: dict, clip: dict, brand: dict, words: list[dict]) -> None:
           f"{f' + {len(zoom_cuts)} zoom cuts' if zoom_cuts else ''}, "
           f"music={music.name if music else 'none'}"
           f"{f', end card {card_s:.1f}s' if card_s else ''}{f', {len(broll)} B-roll' if broll else ''}"
-          f"\n  -> {final}")
+          f"{f', {len(sfx_events)} sound effects' if sfx_events else ''}"
+          f"{f'; {hook_note}' if hook_note else ''}\n  -> {final}")
 
 
 def main() -> None:
